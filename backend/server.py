@@ -15,7 +15,7 @@ from notifications import dispatch_verification_code, load_dotenv
 # Load .env variables
 load_dotenv()
 
-PORT = 8000
+PORT = int(os.environ.get('PORT', 8000))
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIR = os.path.join(BASE_DIR, 'frontend')
 

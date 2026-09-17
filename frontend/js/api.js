@@ -1,10 +1,25 @@
-/**
- * Siri Sofa Services — API Client
- */
-
-const API_BASE = ''; // Same origin
+// Live Cloud Backend URL (e.g. Render, Railway, AWS)
+// If set, the website sends live requests to your cloud Python backend for real SMS/Email!
+const SAVED_BACKEND_URL = (typeof localStorage !== 'undefined') ? localStorage.getItem('siri_backend_url') : null;
+const CLOUD_BACKEND_URL = SAVED_BACKEND_URL || '';
+const API_BASE = CLOUD_BACKEND_URL || '';
 
 const ApiClient = {
+  isStaticMode: (typeof window !== 'undefined' && (window.location.hostname.includes('github.io') || window.location.protocol === 'file:')) && !CLOUD_BACKEND_URL,
+
+  getBackendUrl() {
+    return (typeof localStorage !== 'undefined' && localStorage.getItem('siri_backend_url')) || '';
+  },
+
+  setBackendUrl(url) {
+    if (url) {
+      url = url.trim().replace(/\/+$/, '');
+      localStorage.setItem('siri_backend_url', url);
+    } else {
+      localStorage.removeItem('siri_backend_url');
+    }
+    if (typeof window !== 'undefined') window.location.reload();
+  },
   async request(endpoint, options = {}) {
     const defaultHeaders = {
       'Content-Type': 'application/json'

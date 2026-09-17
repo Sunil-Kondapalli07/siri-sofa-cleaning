@@ -1,0 +1,7 @@
+# Siri Sofa Services — Production Dependencies
+# Zero third-party runtime dependencies required.
+# Built entirely with Python 3 standard library:
+# - http.server & socketserver (REST & Static Server)
+# - sqlite3 (Database)
+# - smtplib & email (Real SMTP Email Gateway)
+# - urllib.request & ssl (Fast2SMS & Twilio HTTP Gateways)
