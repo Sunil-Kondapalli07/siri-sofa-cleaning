@@ -87,17 +87,86 @@ class AppStore {
   async loadInitialData() {
     try {
       const data = await ApiClient.getServices();
-      this.services = data.services || [];
+      if (data && data.services && data.services.length > 0) {
+        this.services = data.services;
+      } else {
+        this.services = this.getFallbackServices();
+      }
 
       const pData = await ApiClient.getPricing();
-      if (pData.config) {
+      if (pData && pData.config) {
         this.pricingConfig = pData.config;
       }
 
       this.notify('services_loaded', this.services);
     } catch (e) {
-      console.error("Failed to load initial services & pricing:", e);
+      console.warn("Backend API not reachable (using static catalog for GitHub Pages deployment):", e);
+      this.services = this.getFallbackServices();
+      this.notify('services_loaded', this.services);
     }
+  }
+
+  getFallbackServices() {
+    return [
+      {
+        id: 1,
+        slug: 'sofa',
+        title: 'Sofa Cleaning',
+        subtitle: 'Deep cleaning & sanitization',
+        description: 'Eco-friendly deep shampoo extraction for fabric, velvet, leather, and faux leather sofas.',
+        icon: 'couch',
+        variants: [
+          { id: 1, service_id: 1, name: '1 Seater Sofa', base_price: 499.0, unit_type: 'seat', estimated_minutes: 30 },
+          { id: 2, service_id: 1, name: '2 Seater Sofa', base_price: 899.0, unit_type: 'seat', estimated_minutes: 45 },
+          { id: 3, service_id: 1, name: '3 Seater Sofa', base_price: 1299.0, unit_type: 'seat', estimated_minutes: 60 },
+          { id: 4, service_id: 1, name: '4 Seater Sofa', base_price: 1699.0, unit_type: 'seat', estimated_minutes: 75 },
+          { id: 5, service_id: 1, name: 'L Shape Sectional', base_price: 2199.0, unit_type: 'sofa', estimated_minutes: 90 },
+          { id: 6, service_id: 1, name: 'Recliner Sofa', base_price: 849.0, unit_type: 'seat', estimated_minutes: 40 },
+          { id: 7, service_id: 1, name: 'Cushion Deep Clean (Set of 5)', base_price: 349.0, unit_type: 'set', estimated_minutes: 20 }
+        ]
+      },
+      {
+        id: 2,
+        slug: 'chair',
+        title: 'Chair Cleaning',
+        subtitle: 'Dining & office seating refresh',
+        description: 'Spot removal, steam deodorizing, and dust extraction for all types of residential & office chairs.',
+        icon: 'chair',
+        variants: [
+          { id: 8, service_id: 2, name: 'Dining Chair', base_price: 199.0, unit_type: 'chair', estimated_minutes: 15 },
+          { id: 9, service_id: 2, name: 'Office Ergonomic Chair', base_price: 299.0, unit_type: 'chair', estimated_minutes: 20 },
+          { id: 10, service_id: 2, name: 'Arm Chair / Accent Chair', base_price: 399.0, unit_type: 'chair', estimated_minutes: 25 },
+          { id: 11, service_id: 2, name: 'Recliner Single Chair', base_price: 599.0, unit_type: 'chair', estimated_minutes: 35 },
+          { id: 12, service_id: 2, name: 'Fabric Stool / Ottoman', base_price: 179.0, unit_type: 'chair', estimated_minutes: 15 }
+        ]
+      },
+      {
+        id: 3,
+        slug: 'mattress',
+        title: 'Mattress Cleaning',
+        subtitle: 'Anti-allergen & dust mite elimination',
+        description: 'High-suction extraction and UV-safe sanitization to ensure pure, hygienic, allergy-free sleep.',
+        icon: 'bed',
+        variants: [
+          { id: 13, service_id: 3, name: 'Single Bed Mattress', base_price: 899.0, unit_type: 'mattress', estimated_minutes: 45 },
+          { id: 14, service_id: 3, name: 'Queen Size Mattress', base_price: 1299.0, unit_type: 'mattress', estimated_minutes: 60 },
+          { id: 15, service_id: 3, name: 'King Size Mattress', base_price: 1599.0, unit_type: 'mattress', estimated_minutes: 75 }
+        ]
+      },
+      {
+        id: 4,
+        slug: 'carpet',
+        title: 'Carpet Cleaning',
+        subtitle: 'Deep fiber restoration',
+        description: 'Heavy-duty rotary scrubber extraction restoring brightness, texture, and deep fiber freshness.',
+        icon: 'layers',
+        variants: [
+          { id: 16, service_id: 4, name: 'Small Accent Rug (< 25 sq ft)', base_price: 599.0, unit_type: 'rug', estimated_minutes: 30 },
+          { id: 17, service_id: 4, name: 'Medium Living Room Carpet (up to 60 sq ft)', base_price: 1199.0, unit_type: 'carpet', estimated_minutes: 50 },
+          { id: 18, service_id: 4, name: 'Large Hall Carpet (up to 120 sq ft)', base_price: 1899.0, unit_type: 'carpet', estimated_minutes: 80 }
+        ]
+      }
+    ];
   }
 
   // Booking Cart Management
