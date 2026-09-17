@@ -17,6 +17,8 @@ const App = {
         this.updateNav();
         if (store.currentView === 'customer') {
           CustomerPortalComponent.loadCustomerData();
+        } else if (store.currentView === 'book') {
+          BookingWizardComponent.refresh();
         }
       }
     });
@@ -1124,7 +1126,11 @@ const App = {
     this.closeSignupVerifyModal();
 
     alert(`🎉 Account fully activated, ${user.name}! Welcome to Siri Sofa Services Hyderabad.`);
-    store.setView('customer');
+    if (store.currentView === 'book') {
+      BookingWizardComponent.refresh();
+    } else {
+      store.setView('customer');
+    }
   },
 
   closeSignupVerifyModal() {
@@ -1192,6 +1198,8 @@ const App = {
       
       if (res.user.role === 'admin') {
         store.setView('admin');
+      } else if (store.currentView === 'book') {
+        BookingWizardComponent.refresh();
       } else {
         store.setView('customer');
       }

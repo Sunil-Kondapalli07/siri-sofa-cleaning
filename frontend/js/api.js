@@ -108,6 +108,10 @@ const ApiClient = {
       return { success: true, message: 'Verified successfully' };
     }
     if (endpoint === '/api/bookings' && method === 'POST') {
+      const curUser = this.getCurrentUser();
+      if (!curUser && !body.user_id) {
+        throw new Error('Sign in required. Please log in or create an account to book an appointment.');
+      }
       const bookingId = 'SIRI-' + Math.floor(100000 + Math.random() * 900000);
       const b = {
         id: bookingId,

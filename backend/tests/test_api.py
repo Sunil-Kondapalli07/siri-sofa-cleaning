@@ -287,6 +287,19 @@ class DirectHandlerTest(unittest.TestCase):
         self.assertEqual(b_detail['booking']['address']['lat'], 17.4156)
         self.assertEqual(b_detail['booking']['address']['lng'], 78.4357)
 
+    def test_04b_unauthenticated_booking_rejected(self):
+        # Guest user attempting to book without signing in must receive 401 Unauthorized
+        guest_payload = {
+            'name': 'Guest Stranger',
+            'phone': '+91 99999 00000',
+            'service_date': '2026-09-28',
+            'service_slot': '11:30 AM',
+            'items': [{'variant_id': 1, 'quantity': 1}]
+        }
+        status, body = self.invoke_api('POST', '/api/bookings', guest_payload)
+        self.assertEqual(status, 401)
+        self.assertIn('Sign in required', body['error'])
+
     def test_05_admin_pricing_and_assignment(self):
         _, p_body = self.invoke_api('GET', '/api/pricing')
         target_variant = p_body['variants'][0]

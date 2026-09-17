@@ -596,9 +596,34 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
             # POST /api/bookings
             elif path == '/api/bookings':
                 user_id = payload.get('user_id')
-                name = payload.get('name', '').strip()
-                phone = payload.get('phone', '').strip()
-                email = payload.get('email', '').strip()
+                token_header = self.headers.get('Authorization', '')
+
+                # Resolve user_id from Bearer token if not explicitly provided
+                if not user_id and token_header.startswith('Bearer '):
+                    token = token_header.replace('Bearer ', '').strip()
+                    if token.startswith('token_'):
+                        try:
+                            user_id = int(token.split('_')[1])
+                        except Exception:
+                            pass
+
+                # Strict Authentication Requirement: Guest bookings are disabled
+                if not user_id:
+                    return self.send_json(401, {
+                        'error': 'Sign in required. Please log in or create an account to schedule a cleaning appointment.'
+                    })
+
+                cursor = conn.cursor()
+                cursor.execute("SELECT id, name, email, phone FROM users WHERE id = ?", (user_id,))
+                user_row = cursor.fetchone()
+                if not user_row:
+                    return self.send_json(401, {
+                        'error': 'User account not found. Please log in again before scheduling.'
+                    })
+
+                name = payload.get('name', '').strip() or user_row['name']
+                phone = payload.get('phone', '').strip() or user_row['phone']
+                email = payload.get('email', '').strip() or user_row['email']
                 address_data = payload.get('address', {})
                 service_date = payload.get('service_date')
                 service_slot = payload.get('service_slot')
@@ -609,7 +634,6 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 if not name or not phone or not service_date or not service_slot or not items:
                     return self.send_json(400, {'error': 'Missing required booking details'})
 
-                cursor = conn.cursor()
                 # Get pricing config
                 cursor.execute("SELECT * FROM pricing_config WHERE id = 1")
                 cfg = dict(cursor.fetchone())

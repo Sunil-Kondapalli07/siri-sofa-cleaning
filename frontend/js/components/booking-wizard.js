@@ -63,12 +63,17 @@ const BookingWizardComponent = {
                   <span>Continue</span>
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                 </button>
-              ` : `
+              ` : (store.currentUser ? `
                 <button id="confirm-booking-btn" onclick="BookingWizardComponent.submitBooking()" class="px-8 py-3.5 rounded-xl font-black text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-xl shadow-teal-600/25 transition-all text-base flex items-center gap-2">
                   <span>Confirm & Schedule Cleaning</span>
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                 </button>
-              `}
+              ` : `
+                <button id="confirm-booking-btn" onclick="BookingWizardComponent.promptAuthBeforeBooking()" class="px-8 py-3.5 rounded-xl font-black text-white bg-amber-600 hover:bg-amber-500 shadow-xl shadow-amber-600/25 transition-all text-base flex items-center gap-2">
+                  <span>🔒 Sign In to Confirm Appointment</span>
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                </button>
+              `)}
             </div>
 
           </div>
@@ -194,6 +199,28 @@ const BookingWizardComponent = {
 
     return `
       <div class="space-y-5">
+        ${!store.currentUser ? `
+          <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-between gap-3 text-left">
+            <div class="flex items-center gap-2.5">
+              <span class="text-xl">🔒</span>
+              <div>
+                <div class="text-xs font-bold text-amber-900">Sign in for faster booking & saved addresses</div>
+                <p class="text-[11px] text-amber-700">Account sign in is required before confirming your cleaning appointment.</p>
+              </div>
+            </div>
+            <button type="button" onclick="NavbarComponent.openAuthModal('login')" class="px-3.5 py-1.5 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition-all shrink-0">
+              Sign In
+            </button>
+          </div>
+        ` : `
+          <div class="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between gap-3 text-left">
+            <div class="flex items-center gap-2">
+              <span class="text-base text-emerald-600 font-bold">✓</span>
+              <span class="text-xs text-emerald-900 font-bold">Logged in as: <strong>${store.currentUser.name}</strong> (${store.currentUser.phone || store.currentUser.email})</span>
+            </div>
+            <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">Verified Account</span>
+          </div>
+        `}
         
         <!-- Free Live OpenStreetMap & GPS Geolocation Card -->
         <div class="rounded-2xl p-4 bg-slate-100/70 border border-slate-200">
@@ -387,6 +414,37 @@ const BookingWizardComponent = {
             Apply
           </button>
         </div>
+
+        <!-- Authentication Verification Card -->
+        ${store.currentUser ? `
+          <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs text-left">
+            <div class="flex items-center gap-2">
+              <span class="text-base text-emerald-600 font-bold">✓</span>
+              <span class="text-emerald-950 font-bold">Authenticated as: <strong>${store.currentUser.name}</strong> (${store.currentUser.phone || store.currentUser.email})</span>
+            </div>
+            <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px] uppercase tracking-wider">Ready to Schedule</span>
+          </div>
+        ` : `
+          <div class="p-5 rounded-2xl bg-amber-50 border-2 border-amber-200 text-left">
+            <div class="flex items-start gap-3">
+              <span class="text-2xl">🔒</span>
+              <div class="flex-1">
+                <h5 class="text-sm font-black text-amber-900">Sign In Required to Complete Booking</h5>
+                <p class="text-xs text-amber-800/90 mt-1 leading-relaxed">
+                  To guarantee technician dispatch, live GPS tracking, and our 100% doorstep hygiene warranty, please sign in or register before confirming.
+                </p>
+                <div class="mt-3.5 flex flex-wrap items-center gap-2.5">
+                  <button type="button" onclick="NavbarComponent.openAuthModal('login')" class="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition-all shadow-sm">
+                    Sign In to Existing Account
+                  </button>
+                  <button type="button" onclick="NavbarComponent.openAuthModal('signup')" class="px-4 py-2 rounded-xl bg-teal-600 text-white font-bold text-xs hover:bg-teal-500 transition-all shadow-sm shadow-teal-600/20">
+                    Create Verified Account (2-Min)
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `}
 
         <!-- Price Breakdown Table -->
         <div class="border-t border-slate-200 pt-4 space-y-2 text-sm">
@@ -713,7 +771,17 @@ const BookingWizardComponent = {
     this.refresh();
   },
 
+  promptAuthBeforeBooking() {
+    alert("🔒 Please sign in or create an account to confirm your cleaning appointment. Your booking details are safely preserved!");
+    NavbarComponent.openAuthModal('login');
+  },
+
   async submitBooking() {
+    if (!store.currentUser) {
+      this.promptAuthBeforeBooking();
+      return;
+    }
+
     if (this.isSubmitting) return;
     this.isSubmitting = true;
 
@@ -726,10 +794,10 @@ const BookingWizardComponent = {
     try {
       const calc = store.getCartCalculations();
       const bookingPayload = {
-        user_id: store.currentUser ? store.currentUser.id : null,
-        name: store.wizard.address.name,
-        phone: store.wizard.address.phone,
-        email: store.wizard.address.email,
+        user_id: store.currentUser.id,
+        name: store.wizard.address.name || store.currentUser.name,
+        phone: store.wizard.address.phone || store.currentUser.phone,
+        email: store.wizard.address.email || store.currentUser.email,
         address: store.wizard.address,
         service_date: store.wizard.serviceDate,
         service_slot: store.wizard.serviceSlot,
