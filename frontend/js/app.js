@@ -535,32 +535,11 @@ const App = {
           </p>
 
           <!-- Secure Dispatch Notice -->
-          <div id="otp-live-notice" class="mb-5 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left flex items-start gap-3">
+          <div class="mb-5 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left flex items-start gap-3">
             <span class="text-lg">🔒</span>
             <div class="text-xs text-slate-700 leading-tight">
               <div class="font-bold text-slate-900">Secure Dispatch Sent</div>
               <p class="text-[11px] text-slate-500 mt-0.5">A verification code has been dispatched. Please check your SMS or email inbox.</p>
-            </div>
-          </div>
-
-          <!-- Static Host Notice for GitHub Pages -->
-          <div id="otp-static-notice" class="hidden mb-5 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-left">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-black text-amber-900 flex items-center gap-1.5">
-                <span>🌐</span> GitHub Pages Demo Mode
-              </span>
-              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900 font-mono">
-                Demo
-              </span>
-            </div>
-            <p class="text-xs text-amber-800 mt-1.5 leading-relaxed">
-              GitHub Pages cannot run Python to send real SMS/emails. Use demo code <b>123456</b>.
-            </p>
-            <div class="mt-2.5">
-              <button type="button" onclick="App.autoFillSingleDemoOtp()" 
-                class="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs transition-all shadow-md shadow-amber-600/20 flex items-center gap-1 cursor-pointer">
-                <span>⚡</span> Auto-fill 123456
-              </button>
             </div>
           </div>
 
@@ -612,17 +591,6 @@ const App = {
     inputs.forEach(inp => inp.value = '');
 
     if (modal) modal.classList.remove('hidden');
-
-    const isStatic = (typeof ApiClient !== 'undefined' && ApiClient.isStaticMode) || window.location.hostname.includes('github.io') || window.location.protocol === 'file:';
-    const liveNotice = document.getElementById('otp-live-notice');
-    const staticNotice = document.getElementById('otp-static-notice');
-    if (isStatic) {
-      if (liveNotice) liveNotice.classList.add('hidden');
-      if (staticNotice) staticNotice.classList.remove('hidden');
-    } else {
-      if (liveNotice) liveNotice.classList.remove('hidden');
-      if (staticNotice) staticNotice.classList.add('hidden');
-    }
 
     // Request real-time OTP from backend
     try {
@@ -763,15 +731,6 @@ const App = {
     }
   },
 
-  autoFillSingleDemoOtp() {
-    const boxes = document.querySelectorAll('#otp-modal .otp-box');
-    const code = '123456';
-    boxes.forEach((box, i) => {
-      box.value = code[i] || '';
-    });
-    this.submitOtpVerification();
-  },
-
   closeOtpModal() {
     clearInterval(this.otpTimerInterval);
     document.getElementById('otp-modal')?.classList.add('hidden');
@@ -796,42 +755,14 @@ const App = {
             </p>
           </div>
 
-          <!-- Real-Time Delivery Notice (Live Cloud Server Mode) -->
-          <div id="signup-live-notice" class="mb-5 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left flex items-start gap-3">
+          <!-- Real-Time Delivery Notice (No OTP on screen) -->
+          <div class="mb-5 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left flex items-start gap-3">
             <span class="text-lg">📩</span>
             <div class="text-xs text-slate-700 leading-tight">
               <div class="font-bold text-slate-900">Separate Secure Codes Dispatched</div>
               <p class="text-[11px] text-slate-500 mt-0.5">
                 Check your SMS inbox for the mobile code and your email inbox (including spam folder) for the email code.
               </p>
-            </div>
-          </div>
-
-          <!-- Static Host Notice (GitHub Pages Demo Preview Mode) -->
-          <div id="signup-static-notice" class="hidden mb-5 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-left">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-black text-amber-900 flex items-center gap-1.5">
-                <span>🌐</span> GitHub Pages Static Demo Mode
-              </span>
-              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900 font-mono">
-                Static Host
-              </span>
-            </div>
-            <p class="text-xs text-amber-800 mt-1.5 leading-relaxed">
-              GitHub Pages only serves static files and does not execute the Python backend to dispatch real telecom SMS or SMTP emails.
-            </p>
-            <div class="mt-3 flex flex-wrap items-center gap-2">
-              <button type="button" onclick="App.autoFillDemoOtps()" 
-                class="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs transition-all shadow-md shadow-amber-600/20 flex items-center gap-1.5 cursor-pointer">
-                <span>⚡</span> Auto-fill Demo OTPs (123456)
-              </button>
-              <span class="text-[11px] text-amber-700 font-medium">or enter any 6 digits (e.g. <b>123456</b>)</span>
-            </div>
-            <div class="mt-2.5 pt-2 border-t border-amber-200/60 text-[11px] text-amber-800 flex items-center justify-between">
-              <span>Want 100% real SMS & emails?</span>
-              <button type="button" onclick="App.promptCloudBackend()" class="font-bold text-amber-950 underline hover:text-amber-800">
-                Connect Cloud Python URL
-              </button>
             </div>
           </div>
 
@@ -960,17 +891,6 @@ const App = {
 
     if (modal) modal.classList.remove('hidden');
 
-    const isStatic = (typeof ApiClient !== 'undefined' && ApiClient.isStaticMode) || window.location.hostname.includes('github.io') || window.location.protocol === 'file:';
-    const liveNotice = document.getElementById('signup-live-notice');
-    const staticNotice = document.getElementById('signup-static-notice');
-    if (isStatic) {
-      if (liveNotice) liveNotice.classList.add('hidden');
-      if (staticNotice) staticNotice.classList.remove('hidden');
-    } else {
-      if (liveNotice) liveNotice.classList.remove('hidden');
-      if (staticNotice) staticNotice.classList.add('hidden');
-    }
-
     // Start 30s countdowns for both channels
     this.startSignupCooldown('mobile', 30);
     this.startSignupCooldown('email', 30);
@@ -978,23 +898,6 @@ const App = {
     setTimeout(() => {
       if (mInput) mInput.focus();
     }, 150);
-  },
-
-  autoFillDemoOtps() {
-    const mInput = document.getElementById('signup-mobile-otp');
-    const eInput = document.getElementById('signup-email-otp');
-    if (mInput) mInput.value = '123456';
-    if (eInput) eInput.value = '123456';
-    this.verifySignupMobile();
-    this.verifySignupEmail();
-  },
-
-  promptCloudBackend() {
-    const current = ApiClient.getBackendUrl();
-    const url = prompt("Enter your live Python cloud backend URL (e.g. https://siri-sofa-backend.onrender.com):", current);
-    if (url !== null) {
-      ApiClient.setBackendUrl(url.trim());
-    }
   },
 
   resetSignupVerificationUI() {
