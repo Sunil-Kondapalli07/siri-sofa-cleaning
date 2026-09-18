@@ -540,6 +540,16 @@ const App = {
     }
   },
 
+  switchToLoginWithIdentifier(identifier) {
+    this.switchAuthTab('login');
+    const authInput = document.getElementById('auth-email');
+    if (authInput && identifier) {
+      authInput.value = identifier;
+      const passInput = document.getElementById('auth-password');
+      if (passInput) passInput.focus();
+    }
+  },
+
   renderOtpModal() {
     return `
       <div id="otp-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
@@ -1269,11 +1279,54 @@ const App = {
       document.getElementById('auth-modal')?.classList.add('hidden');
       this.launchSignupDualVerification(res.user, rawPhone, email);
     } catch (err) {
-      if (errSummary) {
-        errSummary.textContent = `Registration failed: ${err.message}`;
-        errSummary.classList.remove('hidden');
+      const errMsg = err.message || 'Registration failed';
+      const isAlreadyExists = errMsg.toLowerCase().includes('already exists') || errMsg.toLowerCase().includes('already registered');
+
+      if (isAlreadyExists) {
+        if (errMsg.toLowerCase().includes('email')) {
+          if (emailInput) {
+            emailInput.classList.add('border-red-500', 'ring-2', 'ring-red-200');
+            emailInput.focus();
+          }
+          if (emailErr) {
+            emailErr.textContent = 'User already exists with this email. Please sign in instead.';
+            emailErr.classList.remove('hidden');
+          }
+        } else if (errMsg.toLowerCase().includes('mobile') || errMsg.toLowerCase().includes('phone')) {
+          if (phoneInput) {
+            phoneInput.classList.add('border-red-500', 'ring-2', 'ring-red-200');
+            phoneInput.focus();
+          }
+          if (phoneErr) {
+            phoneErr.textContent = 'User already exists with this mobile number. Please sign in instead.';
+            phoneErr.classList.remove('hidden');
+          }
+        }
+
+        if (errSummary) {
+          errSummary.innerHTML = `
+            <div class="flex items-start gap-2.5">
+              <span class="text-amber-600 text-base">⚠️</span>
+              <div class="flex-1">
+                <div class="font-bold text-red-800 text-xs">User Already Exists</div>
+                <div class="text-[11px] text-red-700 mt-0.5">${errMsg}</div>
+                <button type="button" onclick="App.switchToLoginWithIdentifier('${email || phone}')" class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg font-bold text-xs transition-colors shadow-sm">
+                  👉 Click here to Sign In
+                </button>
+              </div>
+            </div>
+          `;
+          errSummary.classList.remove('hidden');
+        } else {
+          alert(`User already exists: ${errMsg}`);
+        }
       } else {
-        alert(`Registration failed: ${err.message}`);
+        if (errSummary) {
+          errSummary.textContent = `Registration failed: ${errMsg}`;
+          errSummary.classList.remove('hidden');
+        } else {
+          alert(`Registration failed: ${errMsg}`);
+        }
       }
     } finally {
       if (btn) {
