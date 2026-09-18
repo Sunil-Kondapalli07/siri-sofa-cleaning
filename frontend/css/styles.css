@@ -304,15 +304,16 @@ h1, h2, h3, h4, h5, h6, .font-display {
   border: 1px solid rgba(255, 255, 255, 0.35);
 }
 
-/* Modern 3D Perspective Tilt Cards */
+/* Professional Card Elevation & Micro-Hover */
+.card-hover-lift,
 .card-3d-tilt {
-  transform-style: preserve-3d;
-  transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.3s ease;
-  will-change: transform;
+  transition: transform 0.28s cubic-bezier(0.2, 0, 0.2, 1), box-shadow 0.28s cubic-bezier(0.2, 0, 0.2, 1), border-color 0.28s ease;
 }
 
+.card-hover-lift:hover,
 .card-3d-tilt:hover {
-  box-shadow: 0 20px 35px -10px rgba(12, 74, 52, 0.15), 0 0 0 1px rgba(12, 74, 52, 0.12);
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px -8px rgba(12, 74, 52, 0.12), 0 0 0 1px rgba(12, 74, 52, 0.1);
 }
 
 /* Floating Animations */

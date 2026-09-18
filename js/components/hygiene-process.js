@@ -91,7 +91,7 @@ const HygieneProcessComponent = {
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
             
             <!-- Step 1 -->
-            <div class="card-3d-tilt bg-white p-6 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 transition-all">
+            <div class="bg-white p-6 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 hover:-translate-y-1 hover:shadow-md transition-all duration-300">
               <div class="flex items-center justify-between mb-3">
                 <span class="text-2xl font-black text-[#0C4A34] font-display">01</span>
                 <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#EBF5F0] text-[#0C4A34]">Fabric Audit</span>
@@ -103,7 +103,7 @@ const HygieneProcessComponent = {
             </div>
 
             <!-- Step 2 -->
-            <div class="card-3d-tilt bg-white p-6 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 transition-all">
+            <div class="bg-white p-6 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 hover:-translate-y-1 hover:shadow-md transition-all duration-300">
               <div class="flex items-center justify-between mb-3">
                 <span class="text-2xl font-black text-[#0C4A34] font-display">02</span>
                 <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#EBF5F0] text-[#0C4A34]">Dry HEPA</span>
@@ -115,7 +115,7 @@ const HygieneProcessComponent = {
             </div>
 
             <!-- Step 3 -->
-            <div class="card-3d-tilt bg-white p-6 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 transition-all">
+            <div class="bg-white p-6 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 hover:-translate-y-1 hover:shadow-md transition-all duration-300">
               <div class="flex items-center justify-between mb-3">
                 <span class="text-2xl font-black text-[#0C4A34] font-display">03</span>
                 <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#EBF5F0] text-[#0C4A34]">Eco-Enzyme</span>
@@ -127,7 +127,7 @@ const HygieneProcessComponent = {
             </div>
 
             <!-- Step 4 -->
-            <div class="card-3d-tilt bg-white p-6 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 transition-all">
+            <div class="bg-white p-6 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 hover:-translate-y-1 hover:shadow-md transition-all duration-300">
               <div class="flex items-center justify-between mb-3">
                 <span class="text-2xl font-black text-[#0C4A34] font-display">04</span>
                 <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#EBF5F0] text-[#0C4A34]">Soft Rotary</span>
@@ -139,7 +139,7 @@ const HygieneProcessComponent = {
             </div>
 
             <!-- Step 5 -->
-            <div class="card-3d-tilt bg-white p-6 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 transition-all">
+            <div class="bg-white p-6 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 hover:-translate-y-1 hover:shadow-md transition-all duration-300">
               <div class="flex items-center justify-between mb-3">
                 <span class="text-2xl font-black text-[#0C4A34] font-display">05</span>
                 <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#EBF5F0] text-[#0C4A34]">12-Bar Suction</span>
@@ -151,7 +151,7 @@ const HygieneProcessComponent = {
             </div>
 
             <!-- Step 6 -->
-            <div class="card-3d-tilt bg-white p-6 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 transition-all">
+            <div class="bg-white p-6 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 hover:-translate-y-1 hover:shadow-md transition-all duration-300">
               <div class="flex items-center justify-between mb-3">
                 <span class="text-2xl font-black text-[#0C4A34] font-display">06</span>
                 <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#EBF5F0] text-[#0C4A34]">Joint Signoff</span>

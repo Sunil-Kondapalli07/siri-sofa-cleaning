@@ -394,21 +394,7 @@ const App = {
   },
 
   init3DMotionEffects() {
-    // 1. Perspective 3D Tilt on cards
-    const tiltCards = document.querySelectorAll('.card-3d-tilt');
-    tiltCards.forEach(card => {
-      card.onmousemove = (e) => {
-        const rect = card.getBoundingClientRect();
-        const x = e.clientX - rect.left - rect.width / 2;
-        const y = e.clientY - rect.top - rect.height / 2;
-        const rx = (y / (rect.height / 2)) * -5;
-        const ry = (x / (rect.width / 2)) * 5;
-        card.style.transform = `perspective(1000px) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) translateY(-4px)`;
-      };
-      card.onmouseleave = () => {
-        card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) translateY(0px)';
-      };
-    });
+    // 3D card tilt removed in favor of sleek, professional CSS hover animations
   },
 
   authTab: 'login', // 'login' or 'signup'

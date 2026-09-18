@@ -51,34 +51,34 @@
   </script>
 
   <!-- Google Fonts & Custom CSS -->
-  <link rel="stylesheet" href="css/styles.css?v=20260919-v5">
+  <link rel="stylesheet" href="css/styles.css?v=20260919-v6">
 
   <!-- Leaflet.js (Free OpenStreetMap Interactive Maps) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Three.js & OrbitControls (for interactive 3D sofa studio & ambient lighting) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
-<body class="bg-[#FAF9F6] antialiased text-[#121820] selection:bg-[#0C4A34] selection:text-white">
+<body class="bg-[#FAF9F6] antialiased text-[#121820] selection:bg-[#0C4A34] selection:text-white relative min-h-screen overflow-x-hidden">
   
+  <!-- Professional Ambient Animated Background Canvas -->
+  <canvas id="bg-ambient-canvas" class="fixed inset-0 w-full h-full pointer-events-none z-0 opacity-70"></canvas>
+
   <!-- Root App Container -->
-  <div id="app"></div>
+  <div id="app" class="relative z-10"></div>
 
   <!-- Application Logic Modules -->
-  <script src="js/api.js?v=20260919-v5"></script>
-  <script src="js/store.js?v=20260919-v5"></script>
-  <script src="js/three-sofa.js?v=20260919-v5"></script>
-  <script src="js/components/navbar.js?v=20260919-v5"></script>
-  <script src="js/components/hero.js?v=20260919-v5"></script>
-  <script src="js/components/hygiene-process.js?v=20260919-v5"></script>
-  <script src="js/components/service-selector.js?v=20260919-v5"></script>
-  <script src="js/components/booking-wizard.js?v=20260919-v5"></script>
-  <script src="js/components/booking-tracker.js?v=20260919-v5"></script>
-  <script src="js/components/customer-portal.js?v=20260919-v5"></script>
-  <script src="js/components/admin-portal.js?v=20260919-v5"></script>
-  <script src="js/components/reviews-faq.js?v=20260919-v5"></script>
-  <script src="js/app.js?v=20260919-v5"></script>
+  <script src="js/api.js?v=20260919-v6"></script>
+  <script src="js/store.js?v=20260919-v6"></script>
+  <script src="js/ambient-background.js?v=20260919-v6"></script>
+  <script src="js/components/navbar.js?v=20260919-v6"></script>
+  <script src="js/components/hero.js?v=20260919-v6"></script>
+  <script src="js/components/hygiene-process.js?v=20260919-v6"></script>
+  <script src="js/components/service-selector.js?v=20260919-v6"></script>
+  <script src="js/components/booking-wizard.js?v=20260919-v6"></script>
+  <script src="js/components/booking-tracker.js?v=20260919-v6"></script>
+  <script src="js/components/customer-portal.js?v=20260919-v6"></script>
+  <script src="js/components/admin-portal.js?v=20260919-v6"></script>
+  <script src="js/components/reviews-faq.js?v=20260919-v6"></script>
+  <script src="js/app.js?v=20260919-v6"></script>
 </body>
 </html>

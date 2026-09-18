@@ -66,7 +66,7 @@ const ServiceSelectorComponent = {
               const isSelected = s.slug === this.activeTab;
 
               return `
-                <div onclick="ServiceSelectorComponent.selectTab('${s.slug}')" class="service-card card-3d-tilt cursor-pointer flex flex-col justify-between ${isSelected ? 'ring-2 ring-[#0C4A34] shadow-xl' : ''}">
+                <div onclick="ServiceSelectorComponent.selectTab('${s.slug}')" class="service-card cursor-pointer flex flex-col justify-between ${isSelected ? 'ring-2 ring-[#0C4A34] shadow-xl' : ''}">
                   <div>
                     <!-- Card Image with Zoom Effect -->
                     <div class="service-img-wrap relative h-48 sm:h-52 w-full overflow-hidden bg-black/5">
