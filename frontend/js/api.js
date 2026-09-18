@@ -113,36 +113,117 @@ const ApiClient = {
         throw new Error('Sign in required. Please log in or create an account to book an appointment.');
       }
       const bookingId = 'SIRI-' + Math.floor(100000 + Math.random() * 900000);
+      let addr = {};
+      try {
+        addr = typeof body.address === 'object' ? (body.address || {}) : JSON.parse(body.address || '{}');
+      } catch (e) {
+        addr = {};
+      }
       const b = {
         id: bookingId,
-        customer_name: body.customer_name,
-        customer_phone: body.customer_phone,
-        customer_email: body.customer_email,
-        address_json: typeof body.address === 'string' ? body.address : JSON.stringify(body.address || {}),
-        service_date: body.service_date,
-        service_slot: body.service_slot,
-        total_amount: body.total_amount,
+        customer_name: body.customer_name || body.name || (curUser ? curUser.name : 'Customer'),
+        customer_phone: body.customer_phone || body.phone || (curUser ? curUser.phone : '+91 98480 12345'),
+        customer_email: body.customer_email || body.email || (curUser ? curUser.email : 'customer@example.com'),
+        address: addr,
+        address_json: JSON.stringify(addr),
+        service_date: body.service_date || new Date().toISOString().split('T')[0],
+        service_slot: body.service_slot || '10:30 AM',
+        total_amount: body.total_amount || 1499,
         status: 'confirmed',
-        created_at: new Date().toISOString()
+        technician_name: 'Raj Kumar',
+        technician_phone: '+91 98480 11223',
+        technician_rating: 4.9,
+        created_at: new Date().toISOString(),
+        items: (body.items && body.items.length) ? body.items : [
+          { id: 1, variant_name: 'Sofa Deep Cleaning & Sanitization', service_name: 'Sofa Cleaning', quantity: 1, total_price: body.total_amount || 1499 }
+        ]
       };
       const existing = JSON.parse(localStorage.getItem('siri_bookings') || '[]');
       existing.unshift(b);
       localStorage.setItem('siri_bookings', JSON.stringify(existing));
       return { success: true, booking_id: bookingId, booking: b };
     }
+    if (endpoint.includes('/reschedule')) {
+      const bId = endpoint.split('/')[3];
+      const existing = JSON.parse(localStorage.getItem('siri_bookings') || '[]');
+      const idx = existing.findIndex(x => x.id && x.id.toUpperCase() === (bId || '').toUpperCase());
+      if (idx !== -1) {
+        existing[idx].service_date = body.service_date;
+        existing[idx].service_slot = body.service_slot;
+        localStorage.setItem('siri_bookings', JSON.stringify(existing));
+      }
+      return { success: true, message: `Booking ${bId} rescheduled to ${body.service_date} at ${body.service_slot}` };
+    }
+    if (endpoint.includes('/status')) {
+      const bId = endpoint.split('/')[3];
+      const existing = JSON.parse(localStorage.getItem('siri_bookings') || '[]');
+      const idx = existing.findIndex(x => x.id && x.id.toUpperCase() === (bId || '').toUpperCase());
+      if (idx !== -1) {
+        existing[idx].status = body.status;
+        localStorage.setItem('siri_bookings', JSON.stringify(existing));
+      }
+      return { success: true, message: 'Status updated' };
+    }
+    if (endpoint.includes('/assign')) {
+      const bId = endpoint.split('/')[3];
+      const existing = JSON.parse(localStorage.getItem('siri_bookings') || '[]');
+      const idx = existing.findIndex(x => x.id && x.id.toUpperCase() === (bId || '').toUpperCase());
+      if (idx !== -1) {
+        existing[idx].technician_id = body.technician_id;
+        existing[idx].status = 'assigned';
+        localStorage.setItem('siri_bookings', JSON.stringify(existing));
+      }
+      return { success: true, message: 'Technician assigned' };
+    }
+    if (endpoint === '/api/bookings' || endpoint.startsWith('/api/bookings?')) {
+      const existing = JSON.parse(localStorage.getItem('siri_bookings') || '[]');
+      return { bookings: existing };
+    }
     if (endpoint.startsWith('/api/bookings/')) {
       const bId = endpoint.split('/')[3];
       const existing = JSON.parse(localStorage.getItem('siri_bookings') || '[]');
-      const found = existing.find(x => x.id === bId) || {
-        id: bId || 'SIRI-928412',
-        customer_name: 'Sunil Kumar',
-        customer_phone: '+91 98480 12345',
-        service_date: '2026-09-25',
-        service_slot: '10:30 AM',
-        status: 'in_transit',
-        total_amount: 1499,
-        address_json: JSON.stringify({ area: 'Banjara Hills', city: 'Hyderabad', lat: 17.4156, lng: 78.4357, street: 'Road No 12' })
-      };
+      let found = existing.find(x => x.id && x.id.toUpperCase() === (bId || '').toUpperCase());
+      if (!found) {
+        found = {
+          id: bId || 'SIRI-928412',
+          customer_name: 'Sunil Kumar',
+          customer_phone: '+91 98480 12345',
+          customer_email: 'sunil@example.com',
+          service_date: '2026-09-25',
+          service_slot: '10:30 AM',
+          status: 'assigned',
+          technician_name: 'Raj Kumar',
+          technician_phone: '+91 98480 11223',
+          technician_rating: 4.9,
+          total_amount: 1499,
+          created_at: new Date().toISOString(),
+          address: { house_flat: 'Flat 402, Royal Palms', street: 'Road No 12', area: 'Banjara Hills', city: 'Hyderabad', pincode: '500034', lat: 17.4156, lng: 78.4357 },
+          address_json: JSON.stringify({ house_flat: 'Flat 402, Royal Palms', street: 'Road No 12', area: 'Banjara Hills', city: 'Hyderabad', pincode: '500034', lat: 17.4156, lng: 78.4357 }),
+          items: [
+            { id: 1, variant_name: '3-Seater Fabric Sofa Deep Clean', service_name: 'Sofa Cleaning', quantity: 1, total_price: 1099 },
+            { id: 2, variant_name: 'Single Mattress Steam Sanitization', service_name: 'Mattress Cleaning', quantity: 1, total_price: 400 }
+          ]
+        };
+      } else {
+        // Ensure address is always parsed object
+        if (!found.address || typeof found.address !== 'object') {
+          try {
+            found.address = found.address_json ? JSON.parse(found.address_json) : {};
+          } catch(e) {
+            found.address = {};
+          }
+        }
+        if (!found.items || !found.items.length) {
+          found.items = [
+            { id: 1, variant_name: 'Sofa Deep Cleaning & Sanitization', service_name: 'Sofa Cleaning', quantity: 1, total_price: found.total_amount || 1499 }
+          ];
+        }
+        if (!found.technician_name) {
+          found.technician_name = 'Raj Kumar';
+          found.technician_phone = '+91 98480 11223';
+          found.technician_rating = 4.9;
+        }
+      }
       return { booking: found };
     }
     if (endpoint === '/api/technicians') {

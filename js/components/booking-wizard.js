@@ -243,26 +243,33 @@ const BookingWizardComponent = {
           <div id="booking-location-map" style="height: 220px; border-radius: 12px; z-index: 1;" class="w-full shadow-inner border border-slate-200"></div>
         </div>
 
+        <div id="w-step3-err" class="hidden p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-bold"></div>
+
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-bold text-slate-700 mb-1">Full Name *</label>
             <input type="text" id="w-name" value="${nameVal}" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="e.g. Rahul Sharma">
+            <div id="w-name-err" class="hidden text-xs text-red-600 font-bold mt-1"></div>
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Phone Number *</label>
-            <input type="text" id="w-phone" value="${phoneVal}" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="e.g. +91 98765 43210">
+            <label class="block text-xs font-bold text-slate-700 mb-1">Mobile Number *</label>
+            <input type="text" id="w-phone" value="${phoneVal}" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="e.g. 9876543210">
+            <div id="w-phone-err" class="hidden text-xs text-red-600 font-bold mt-1"></div>
           </div>
           <div class="sm:col-span-2">
             <label class="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
             <input type="email" id="w-email" value="${emailVal}" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="e.g. rahul@example.com">
+            <div id="w-email-err" class="hidden text-xs text-red-600 font-bold mt-1"></div>
           </div>
           <div>
             <label class="block text-xs font-bold text-slate-700 mb-1">House / Flat / Villa No. *</label>
             <input type="text" id="w-flat" value="${addr.house_flat || ''}" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="Flat 402, Tower B">
+            <div id="w-flat-err" class="hidden text-xs text-red-600 font-bold mt-1"></div>
           </div>
           <div>
             <label class="block text-xs font-bold text-slate-700 mb-1">Street / Building *</label>
             <input type="text" id="w-street" value="${addr.street || ''}" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="Road No. 12, Jubilee Enclave">
+            <div id="w-street-err" class="hidden text-xs text-red-600 font-bold mt-1"></div>
           </div>
           <div>
             <label class="block text-xs font-bold text-slate-700 mb-1">Hyderabad Locality / Area *</label>
@@ -292,6 +299,7 @@ const BookingWizardComponent = {
               <option value="Bowenpally">
               <option value="Trimulgherry">
             </datalist>
+            <div id="w-area-err" class="hidden text-xs text-red-600 font-bold mt-1"></div>
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
@@ -303,7 +311,8 @@ const BookingWizardComponent = {
             </div>
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1">Pincode *</label>
-              <input type="text" id="w-pincode" value="${addr.pincode || ''}" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="e.g. 500034">
+              <input type="text" id="w-pincode" value="${addr.pincode || ''}" maxlength="6" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="e.g. 500034">
+              <div id="w-pincode-err" class="hidden text-xs text-red-600 font-bold mt-1"></div>
             </div>
           </div>
           <div class="sm:col-span-2">
@@ -317,18 +326,23 @@ const BookingWizardComponent = {
 
   // Step 4: Date & Slot Selection with Real-time Backend Check
   renderStep4() {
-    const selectedDate = store.wizard.serviceDate;
+    const today = new Date().toISOString().split('T')[0];
+    const selectedDate = (store.wizard.serviceDate && store.wizard.serviceDate >= today) 
+      ? store.wizard.serviceDate 
+      : (store.getDefaultDate() || today);
     const selectedSlot = store.wizard.serviceSlot;
 
     return `
       <div class="space-y-6">
+        <div id="w-step4-err" class="hidden p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-bold"></div>
+
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-2">Select Service Date</label>
-          <input type="date" id="w-date" value="${selectedDate}" onchange="BookingWizardComponent.onDateChanged(this.value)" class="w-full sm:w-64 px-4 py-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-teal-500 focus:outline-none bg-white">
+          <label class="block text-xs font-bold text-slate-700 mb-2">Select Service Date *</label>
+          <input type="date" id="w-date" min="${today}" value="${selectedDate}" onchange="BookingWizardComponent.onDateChanged(this.value)" class="w-full sm:w-64 px-4 py-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-teal-500 focus:outline-none bg-white">
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-2">Choose Time Slot (Real-time Availability)</label>
+          <label class="block text-xs font-bold text-slate-700 mb-2">Choose Time Slot (Real-time Availability) *</label>
           <div id="slots-container" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             ${BookingWizardComponent.renderSlotsHtml(selectedSlot)}
           </div>
@@ -403,16 +417,19 @@ const BookingWizardComponent = {
           <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
             <div class="text-xs text-slate-400 font-medium">Customer & Address</div>
             <div class="font-bold text-slate-900 text-sm mt-1">${addr.name} (${addr.phone})</div>
-            <div class="text-xs text-slate-500">${addr.house_flat}, ${addr.area}, ${addr.city}</div>
+            <div class="text-xs text-slate-500">${addr.house_flat ? addr.house_flat + ', ' : ''}${addr.street ? addr.street + ', ' : ''}${addr.area || ''}, ${addr.city || 'Hyderabad'}${addr.pincode ? ' - ' + addr.pincode : ''}</div>
           </div>
         </div>
 
         <!-- Coupon Code Box -->
-        <div class="flex items-center gap-2">
-          <input type="text" id="w-coupon" placeholder="Coupon Code (e.g. FRESH50, FIRST100)" value="${store.wizard.couponCode}" class="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold uppercase focus:ring-2 focus:ring-teal-500 focus:outline-none">
-          <button onclick="BookingWizardComponent.applyCoupon()" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-sm transition-colors">
-            Apply
-          </button>
+        <div>
+          <div class="flex items-center gap-2">
+            <input type="text" id="w-coupon" placeholder="Coupon Code (e.g. FRESH50, FIRST100)" value="${store.wizard.couponCode}" class="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold uppercase focus:ring-2 focus:ring-teal-500 focus:outline-none">
+            <button onclick="BookingWizardComponent.applyCoupon()" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-sm transition-colors">
+              Apply
+            </button>
+          </div>
+          <div id="w-coupon-msg" class="hidden text-xs font-bold mt-1.5"></div>
         </div>
 
         <!-- Authentication Verification Card -->
@@ -506,6 +523,9 @@ const BookingWizardComponent = {
         console.warn("Leaflet cleanup notice", e);
       }
       this.map = null;
+    }
+    if (mapEl._leaflet_id) {
+      mapEl._leaflet_id = null;
     }
 
     // Default Hyderabad center coordinates (Banjara Hills / Hitec City corridor)
@@ -700,22 +720,202 @@ const BookingWizardComponent = {
 
   async applyCoupon() {
     const input = document.getElementById('w-coupon');
+    const msgEl = document.getElementById('w-coupon-msg');
     if (!input) return;
     const code = input.value.trim().toUpperCase();
-    if (!code) return;
+    if (!code) {
+      if (msgEl) {
+        msgEl.textContent = 'Please enter a coupon code (e.g. FRESH50, FIRST100)';
+        msgEl.className = 'text-xs font-bold text-amber-700 mt-1.5 block';
+      }
+      return;
+    }
 
     const calc = store.getCartCalculations();
     try {
       const res = await ApiClient.validateCoupon(code, calc.subtotal);
       if (res.valid) {
         store.wizard.couponCode = code;
-        store.wizard.discount = res.discount;
-        alert(`Coupon ${code} applied successfully! Saved ₹${res.discount}`);
+        store.wizard.discount = res.discount || Math.round((calc.subtotal * (res.discount_percent || 0)) / 100);
+        if (msgEl) {
+          msgEl.textContent = `✅ Coupon ${code} applied! Saved ₹${store.wizard.discount}`;
+          msgEl.className = 'text-xs font-bold text-emerald-700 mt-1.5 block';
+        }
         this.refresh();
       }
     } catch (err) {
-      alert(err.message || 'Invalid coupon code');
+      if (msgEl) {
+        msgEl.textContent = `❌ ${err.message || 'Invalid coupon code'}`;
+        msgEl.className = 'text-xs font-bold text-red-600 mt-1.5 block';
+      } else {
+        alert(err.message || 'Invalid coupon code');
+      }
     }
+  },
+
+  validateStep1() {
+    if (!store.wizard.selectedCategories || store.wizard.selectedCategories.length === 0) {
+      alert("Please select at least one cleaning service category.");
+      return false;
+    }
+    return true;
+  },
+
+  validateStep2(calc) {
+    if (calc.itemCount === 0) {
+      alert("Please specify at least 1 item or seat quantity.");
+      return false;
+    }
+    const minOrder = (store.pricingConfig && store.pricingConfig.min_booking_amount) || 499;
+    if (calc.subtotal < minOrder) {
+      alert(`Minimum booking amount for doorstep service is ₹${minOrder}. Current total is ₹${calc.subtotal}. Please add items or seats to continue.`);
+      return false;
+    }
+    return true;
+  },
+
+  validateStep3() {
+    const errSummary = document.getElementById('w-step3-err');
+    if (errSummary) errSummary.classList.add('hidden');
+
+    const fields = [
+      { id: 'w-name', errId: 'w-name-err' },
+      { id: 'w-phone', errId: 'w-phone-err' },
+      { id: 'w-email', errId: 'w-email-err' },
+      { id: 'w-flat', errId: 'w-flat-err' },
+      { id: 'w-street', errId: 'w-street-err' },
+      { id: 'w-area', errId: 'w-area-err' },
+      { id: 'w-pincode', errId: 'w-pincode-err' }
+    ];
+
+    fields.forEach(f => {
+      const input = document.getElementById(f.id);
+      const errEl = document.getElementById(f.errId);
+      if (input) input.classList.remove('border-red-500', 'ring-2', 'ring-red-200');
+      if (errEl) {
+        errEl.textContent = '';
+        errEl.classList.add('hidden');
+      }
+    });
+
+    const name = document.getElementById('w-name')?.value.trim() || '';
+    const phone = document.getElementById('w-phone')?.value.trim() || '';
+    const email = document.getElementById('w-email')?.value.trim() || '';
+    const flat = document.getElementById('w-flat')?.value.trim() || '';
+    const street = document.getElementById('w-street')?.value.trim() || '';
+    const area = document.getElementById('w-area')?.value.trim() || '';
+    const city = document.getElementById('w-city')?.value || 'Hyderabad';
+    const pincode = document.getElementById('w-pincode')?.value.trim() || '';
+    const inst = document.getElementById('w-instructions')?.value.trim() || '';
+
+    let hasError = false;
+    let firstErrorInput = null;
+
+    const setError = (inputId, errId, msg) => {
+      hasError = true;
+      const input = document.getElementById(inputId);
+      const errEl = document.getElementById(errId);
+      if (input) {
+        input.classList.add('border-red-500', 'ring-2', 'ring-red-200');
+        if (!firstErrorInput) firstErrorInput = input;
+      }
+      if (errEl) {
+        errEl.textContent = msg;
+        errEl.classList.remove('hidden');
+      }
+    };
+
+    if (!name || name.length < 2) {
+      setError('w-name', 'w-name-err', 'Please enter your full name (at least 2 letters).');
+    } else if (!/^[a-zA-Z\s.'-]+$/.test(name)) {
+      setError('w-name', 'w-name-err', 'Name must contain only alphabetical characters.');
+    }
+
+    const rawPhone = phone.replace(/^(\+91|91|0)/, '').replace(/[\s-]/g, '');
+    if (!rawPhone) {
+      setError('w-phone', 'w-phone-err', 'Mobile number is required.');
+    } else if (!/^[6-9]\d{9}$/.test(rawPhone)) {
+      setError('w-phone', 'w-phone-err', 'Enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.');
+    }
+
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('w-email', 'w-email-err', 'Please enter a valid email address (e.g. name@example.com).');
+    }
+
+    if (!flat || flat.length < 2) {
+      setError('w-flat', 'w-flat-err', 'House / Flat / Villa number is required.');
+    }
+
+    if (!street || street.length < 3) {
+      setError('w-street', 'w-street-err', 'Street or building name is required (minimum 3 characters).');
+    }
+
+    if (!area || area.length < 2) {
+      setError('w-area', 'w-area-err', 'Please select or enter your Hyderabad locality.');
+    }
+
+    if (!pincode) {
+      setError('w-pincode', 'w-pincode-err', 'Pincode is required.');
+    } else if (!/^\d{6}$/.test(pincode)) {
+      setError('w-pincode', 'w-pincode-err', 'Enter a valid 6-digit postal code.');
+    }
+
+    if (hasError) {
+      if (errSummary) {
+        errSummary.textContent = 'Please fill in all required location details correctly before continuing.';
+        errSummary.classList.remove('hidden');
+      }
+      if (firstErrorInput) firstErrorInput.focus();
+      return false;
+    }
+
+    store.wizard.address = {
+      name, phone: rawPhone, email, house_flat: flat, street, area, city, pincode, instructions: inst
+    };
+    return true;
+  },
+
+  validateStep4() {
+    const today = new Date().toISOString().split('T')[0];
+    const dateInput = document.getElementById('w-date');
+    const selectedDate = dateInput?.value || store.wizard.serviceDate;
+    const selectedSlot = store.wizard.serviceSlot;
+    const errBox = document.getElementById('w-step4-err');
+
+    if (errBox) errBox.classList.add('hidden');
+
+    if (!selectedDate) {
+      if (errBox) {
+        errBox.textContent = 'Please select a valid service date.';
+        errBox.classList.remove('hidden');
+      } else {
+        alert('Please select a valid service date.');
+      }
+      return false;
+    }
+
+    if (selectedDate < today) {
+      if (errBox) {
+        errBox.textContent = 'Service date cannot be in the past. Please select today or an upcoming date.';
+        errBox.classList.remove('hidden');
+      } else {
+        alert('Service date cannot be in the past. Please select today or an upcoming date.');
+      }
+      return false;
+    }
+
+    if (!selectedSlot) {
+      if (errBox) {
+        errBox.textContent = 'Please select a preferred arrival time slot.';
+        errBox.classList.remove('hidden');
+      } else {
+        alert('Please select a preferred arrival time slot.');
+      }
+      return false;
+    }
+
+    store.wizard.serviceDate = selectedDate;
+    return true;
   },
 
   nextStep() {
@@ -723,12 +923,7 @@ const BookingWizardComponent = {
     const calc = store.getCartCalculations();
 
     if (s === 1) {
-      // Must have at least 1 category
-      if (store.wizard.selectedCategories.length === 0) {
-        alert("Please select at least one service category.");
-        return;
-      }
-      // Auto-populate 1 3-seater sofa if nothing chosen yet
+      if (!this.validateStep1()) return;
       if (calc.itemCount === 0) {
         const sofaSvc = store.services.find(x => x.slug === 'sofa');
         if (sofaSvc && sofaSvc.variants && sofaSvc.variants.length > 2) {
@@ -736,30 +931,11 @@ const BookingWizardComponent = {
         }
       }
     } else if (s === 2) {
-      if (calc.itemCount === 0) {
-        alert("Please specify at least 1 item or seat quantity.");
-        return;
-      }
+      if (!this.validateStep2(calc)) return;
     } else if (s === 3) {
-      // Save form fields
-      const name = document.getElementById('w-name')?.value.trim();
-      const phone = document.getElementById('w-phone')?.value.trim();
-      const email = document.getElementById('w-email')?.value.trim();
-      const flat = document.getElementById('w-flat')?.value.trim();
-      const street = document.getElementById('w-street')?.value.trim();
-      const area = document.getElementById('w-area')?.value.trim();
-      const city = document.getElementById('w-city')?.value;
-      const pincode = document.getElementById('w-pincode')?.value.trim();
-      const inst = document.getElementById('w-instructions')?.value.trim();
-
-      if (!name || !phone || !flat || !street || !area) {
-        alert("Please enter all required location fields (Name, Phone, Flat, Street, Area).");
-        return;
-      }
-
-      store.wizard.address = {
-        name, phone, email, house_flat: flat, street, area, city, pincode, instructions: inst
-      };
+      if (!this.validateStep3()) return;
+    } else if (s === 4) {
+      if (!this.validateStep4()) return;
     }
 
     store.wizard.step = Math.min(5, s + 1);

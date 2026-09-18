@@ -238,7 +238,10 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 bookings = []
                 for row in cursor.fetchall():
                     b_dict = dict(row)
-                    b_dict['address'] = json.loads(b_dict['address_json'])
+                    try:
+                        b_dict['address'] = json.loads(b_dict['address_json'])
+                    except Exception:
+                        b_dict['address'] = {}
                     cursor.execute("SELECT * FROM booking_items WHERE booking_id = ?", (b_dict['id'],))
                     b_dict['items'] = [dict(item) for item in cursor.fetchall()]
                     bookings.append(b_dict)
@@ -251,14 +254,17 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     SELECT b.*, t.name as technician_name, t.phone as technician_phone, t.rating as technician_rating
                     FROM bookings b
                     LEFT JOIN technicians t ON b.technician_id = t.id
-                    WHERE b.id = ?
+                    WHERE UPPER(b.id) = UPPER(?)
                 """, (booking_id,))
                 row = cursor.fetchone()
                 if not row:
                     return self.send_json(404, {'error': f'Booking {booking_id} not found'})
                 b_dict = dict(row)
-                b_dict['address'] = json.loads(b_dict['address_json'])
-                cursor.execute("SELECT * FROM booking_items WHERE booking_id = ?", (booking_id,))
+                try:
+                    b_dict['address'] = json.loads(b_dict['address_json'])
+                except Exception:
+                    b_dict['address'] = {}
+                cursor.execute("SELECT * FROM booking_items WHERE booking_id = ?", (b_dict['id'],))
                 b_dict['items'] = [dict(item) for item in cursor.fetchall()]
                 return self.send_json(200, {'booking': b_dict})
 
@@ -837,7 +843,7 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 cursor.execute("""
                     UPDATE bookings 
                     SET service_date = ?, service_slot = ?, updated_at = ?
-                    WHERE id = ?
+                    WHERE UPPER(id) = UPPER(?)
                 """, (new_date, new_slot, now, booking_id))
                 conn.commit()
                 return self.send_json(200, {'message': f'Booking {booking_id} rescheduled to {new_date} at {new_slot}'})

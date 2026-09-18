@@ -140,7 +140,7 @@ const CustomerPortalComponent = {
                   </div>
                   <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
                     <div class="text-[11px] text-slate-400">Location</div>
-                    <div class="text-sm font-bold text-slate-800 truncate">${upcoming.address.area || 'Hyderabad'}, ${upcoming.address.city || ''}</div>
+                    <div class="text-sm font-bold text-slate-800 truncate">${(upcoming.address && upcoming.address.area) || 'Hyderabad'}, ${(upcoming.address && upcoming.address.city) || 'Hyderabad'}</div>
                   </div>
                 </div>
 
@@ -238,7 +238,7 @@ const CustomerPortalComponent = {
                     ${(b.items || []).map(i => `${i.variant_name} × ${i.quantity}`).join(', ')}
                   </div>
                   <div class="text-xs text-slate-400 mt-0.5">
-                    ${b.service_date} at ${b.service_slot} • ${b.address.area || 'Hyderabad'}
+                    ${b.service_date} at ${b.service_slot} • ${(b.address && b.address.area) || 'Hyderabad'}
                   </div>
                 </div>
 
@@ -271,11 +271,15 @@ const CustomerPortalComponent = {
     const savedAddresses = [];
     const seen = new Set();
     (this.customerBookings || []).forEach(b => {
-      if (b.address && b.address.house_flat && b.address.area) {
-        const key = `${b.address.house_flat}-${b.address.area}`.toLowerCase();
+      let addr = b.address;
+      if (typeof addr === 'string') {
+        try { addr = JSON.parse(addr); } catch(e) { addr = {}; }
+      }
+      if (addr && addr.house_flat && addr.area) {
+        const key = `${addr.house_flat}-${addr.area}`.toLowerCase();
         if (!seen.has(key)) {
           seen.add(key);
-          savedAddresses.push(b.address);
+          savedAddresses.push(addr);
         }
       }
     });

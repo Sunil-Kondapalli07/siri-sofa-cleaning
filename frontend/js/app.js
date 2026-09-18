@@ -348,6 +348,23 @@ const App = {
     const btn = document.getElementById('staff-login-submit-btn');
 
     if (errBox) errBox.classList.add('hidden');
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      if (errBox) {
+        errBox.innerText = 'Please enter a valid staff email address (e.g. admin@sirisofa.com).';
+        errBox.classList.remove('hidden');
+      }
+      return;
+    }
+
+    if (!password || password.length < 4) {
+      if (errBox) {
+        errBox.innerText = 'Please enter your staff password (at least 4 characters).';
+        errBox.classList.remove('hidden');
+      }
+      return;
+    }
+
     if (btn) {
       btn.disabled = true;
       btn.innerText = 'Verifying staff credentials...';
@@ -405,15 +422,19 @@ const App = {
 
           <!-- 1. SIGN IN FORM -->
           <div id="auth-login-view" class="${this.authTab === 'login' ? 'block' : 'hidden'}">
-            <form onsubmit="App.handleLogin(event)" class="space-y-4">
+            <form onsubmit="App.handleLogin(event)" class="space-y-4" novalidate>
+              <div id="auth-login-error" class="hidden p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-bold"></div>
+
               <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Email / Phone *</label>
-                <input type="email" id="auth-email" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="name@example.com">
+                <label class="block text-xs font-bold text-slate-700 mb-1">Email or Mobile Number *</label>
+                <input type="text" id="auth-email" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="name@example.com or 9876543210">
+                <div id="auth-email-err" class="hidden text-xs text-red-600 font-bold mt-1"></div>
               </div>
 
               <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1">Password *</label>
-                <input type="password" id="auth-password" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="••••••••">
+                <input type="password" id="auth-password" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="••••••••">
+                <div id="auth-password-err" class="hidden text-xs text-red-600 font-bold mt-1"></div>
               </div>
 
               <button type="submit" id="auth-submit-btn" class="w-full py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-black text-sm shadow-md transition-colors">
@@ -431,16 +452,20 @@ const App = {
 
           <!-- 2. SIGN UP (REGISTRATION) FORM -->
           <div id="auth-signup-view" class="${this.authTab === 'signup' ? 'block' : 'hidden'}">
-            <form onsubmit="App.handleRegister(event)" class="space-y-3.5">
+            <form onsubmit="App.handleRegister(event)" class="space-y-3.5" novalidate>
+              <div id="auth-signup-error" class="hidden p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-bold mb-2"></div>
+
               <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1">Full Name *</label>
-                <input type="text" id="reg-name" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="e.g. Ramesh Reddy">
+                <input type="text" id="reg-name" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="e.g. Ramesh Reddy">
+                <div id="reg-name-err" class="hidden text-xs text-red-600 font-bold mt-1"></div>
               </div>
 
               <div class="grid grid-cols-2 gap-2">
                 <div>
                   <label class="block text-xs font-bold text-slate-700 mb-1">Mobile (+91) *</label>
-                  <input type="text" id="reg-phone" required class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="+91 98480 99887">
+                  <input type="text" id="reg-phone" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="98480 99887">
+                  <div id="reg-phone-err" class="hidden text-xs text-red-600 font-bold mt-1"></div>
                 </div>
                 <div>
                   <label class="block text-xs font-bold text-slate-700 mb-1">Hyderabad Area *</label>
@@ -454,17 +479,20 @@ const App = {
                     <option value="Secunderabad">Secunderabad</option>
                     <option value="Manikonda">Manikonda</option>
                   </select>
+                  <div id="reg-area-err" class="hidden text-xs text-red-600 font-bold mt-1"></div>
                 </div>
               </div>
 
               <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1">Email Address *</label>
-                <input type="email" id="reg-email" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="ramesh@example.com">
+                <input type="email" id="reg-email" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="ramesh@example.com">
+                <div id="reg-email-err" class="hidden text-xs text-red-600 font-bold mt-1"></div>
               </div>
 
               <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1">Create Password *</label>
-                <input type="password" id="reg-password" required minlength="4" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="At least 4 characters">
+                <input type="password" id="reg-password" minlength="6" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="At least 6 characters">
+                <div id="reg-password-err" class="hidden text-xs text-red-600 font-bold mt-1"></div>
               </div>
 
               <div class="text-[11px] text-slate-500">
@@ -1144,15 +1172,87 @@ const App = {
 
   async handleRegister(e) {
     e.preventDefault();
-    const name = document.getElementById('reg-name')?.value.trim();
-    const phone = document.getElementById('reg-phone')?.value.trim();
-    const email = document.getElementById('reg-email')?.value.trim();
-    const password = document.getElementById('reg-password')?.value;
-    const area = document.getElementById('reg-area')?.value;
+    const nameInput = document.getElementById('reg-name');
+    const phoneInput = document.getElementById('reg-phone');
+    const emailInput = document.getElementById('reg-email');
+    const passInput = document.getElementById('reg-password');
+    const areaInput = document.getElementById('reg-area');
     const btn = document.getElementById('reg-submit-btn');
 
-    if (!name || !email || !password || !phone) {
-      alert("Please fill in all required fields, including mobile number.");
+    const errSummary = document.getElementById('auth-signup-error');
+    const nameErr = document.getElementById('reg-name-err');
+    const phoneErr = document.getElementById('reg-phone-err');
+    const emailErr = document.getElementById('reg-email-err');
+    const passErr = document.getElementById('reg-password-err');
+    const areaErr = document.getElementById('reg-area-err');
+
+    const resetField = (input, errEl) => {
+      if (input) input.classList.remove('border-red-500', 'ring-2', 'ring-red-200');
+      if (errEl) { errEl.textContent = ''; errEl.classList.add('hidden'); }
+    };
+    resetField(nameInput, nameErr);
+    resetField(phoneInput, phoneErr);
+    resetField(emailInput, emailErr);
+    resetField(passInput, passErr);
+    resetField(areaInput, areaErr);
+    if (errSummary) errSummary.classList.add('hidden');
+
+    const name = nameInput?.value.trim() || '';
+    const phone = phoneInput?.value.trim() || '';
+    const email = emailInput?.value.trim() || '';
+    const password = passInput?.value || '';
+    const area = areaInput?.value || '';
+
+    let hasError = false;
+    let firstErrorInput = null;
+
+    const setError = (input, errEl, msg) => {
+      hasError = true;
+      if (input) {
+        input.classList.add('border-red-500', 'ring-2', 'ring-red-200');
+        if (!firstErrorInput) firstErrorInput = input;
+      }
+      if (errEl) {
+        errEl.textContent = msg;
+        errEl.classList.remove('hidden');
+      }
+    };
+
+    if (!name || name.length < 2) {
+      setError(nameInput, nameErr, 'Please enter your full name (at least 2 letters).');
+    } else if (!/^[a-zA-Z\s.'-]+$/.test(name)) {
+      setError(nameInput, nameErr, 'Name must contain only alphabetic characters.');
+    }
+
+    const rawPhone = phone.replace(/^(\+91|91|0)/, '').replace(/[\s-]/g, '');
+    if (!rawPhone) {
+      setError(phoneInput, phoneErr, 'Mobile number is required.');
+    } else if (!/^[6-9]\d{9}$/.test(rawPhone)) {
+      setError(phoneInput, phoneErr, 'Enter a valid 10-digit Indian mobile number (e.g. 9848012345).');
+    }
+
+    if (!email) {
+      setError(emailInput, emailErr, 'Email address is required.');
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError(emailInput, emailErr, 'Please enter a valid email format (e.g. name@example.com).');
+    }
+
+    if (!password) {
+      setError(passInput, passErr, 'Password is required.');
+    } else if (password.length < 6) {
+      setError(passInput, passErr, 'Password must be at least 6 characters.');
+    }
+
+    if (!area) {
+      setError(areaInput, areaErr, 'Please select your Hyderabad area.');
+    }
+
+    if (hasError) {
+      if (errSummary) {
+        errSummary.textContent = 'Please correct the errors in the form before proceeding.';
+        errSummary.classList.remove('hidden');
+      }
+      if (firstErrorInput) firstErrorInput.focus();
       return;
     }
 
@@ -1162,16 +1262,19 @@ const App = {
     }
 
     try {
-      const res = await ApiClient.register(name, email, phone, password);
-      // Remember area choice for booking flow
+      const res = await ApiClient.register(name, email, rawPhone, password);
       store.wizard.address.area = area || 'Banjara Hills';
       store.wizard.address.city = 'Hyderabad';
 
-      // Hide auth modal and launch dual verification step
       document.getElementById('auth-modal')?.classList.add('hidden');
-      this.launchSignupDualVerification(res.user, phone, email);
+      this.launchSignupDualVerification(res.user, rawPhone, email);
     } catch (err) {
-      alert(`Registration failed: ${err.message}`);
+      if (errSummary) {
+        errSummary.textContent = `Registration failed: ${err.message}`;
+        errSummary.classList.remove('hidden');
+      } else {
+        alert(`Registration failed: ${err.message}`);
+      }
     } finally {
       if (btn) {
         btn.innerHTML = `Create My Account & Continue`;
@@ -1182,9 +1285,50 @@ const App = {
 
   async handleLogin(e) {
     e.preventDefault();
-    const email = document.getElementById('auth-email')?.value.trim();
-    const password = document.getElementById('auth-password')?.value;
+    const loginErr = document.getElementById('auth-login-error');
+    const emailErr = document.getElementById('auth-email-err');
+    const passErr = document.getElementById('auth-password-err');
+    const emailInput = document.getElementById('auth-email');
+    const passInput = document.getElementById('auth-password');
     const btn = document.getElementById('auth-submit-btn');
+
+    if (loginErr) loginErr.classList.add('hidden');
+    if (emailErr) emailErr.classList.add('hidden');
+    if (passErr) passErr.classList.add('hidden');
+    if (emailInput) emailInput.classList.remove('border-red-500', 'ring-2', 'ring-red-200');
+    if (passInput) passInput.classList.remove('border-red-500', 'ring-2', 'ring-red-200');
+
+    const emailOrPhone = emailInput?.value.trim() || '';
+    const password = passInput?.value || '';
+
+    let hasError = false;
+
+    // Check if input is a valid email or a valid 10-digit phone
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailOrPhone);
+    const rawDigits = emailOrPhone.replace(/^(\+91|91|0)/, '').replace(/[\s-]/g, '');
+    const isPhone = /^[6-9]\d{9}$/.test(rawDigits);
+
+    if (!emailOrPhone) {
+      if (emailErr) { emailErr.textContent = 'Please enter your registered email or mobile number.'; emailErr.classList.remove('hidden'); }
+      if (emailInput) emailInput.classList.add('border-red-500', 'ring-2', 'ring-red-200');
+      hasError = true;
+    } else if (!isEmail && !isPhone) {
+      if (emailErr) { emailErr.textContent = 'Please enter a valid email address or 10-digit Indian mobile number.'; emailErr.classList.remove('hidden'); }
+      if (emailInput) emailInput.classList.add('border-red-500', 'ring-2', 'ring-red-200');
+      hasError = true;
+    }
+
+    if (!password) {
+      if (passErr) { passErr.textContent = 'Please enter your password.'; passErr.classList.remove('hidden'); }
+      if (passInput) passInput.classList.add('border-red-500', 'ring-2', 'ring-red-200');
+      hasError = true;
+    } else if (password.length < 4) {
+      if (passErr) { passErr.textContent = 'Password must be at least 4 characters.'; passErr.classList.remove('hidden'); }
+      if (passInput) passInput.classList.add('border-red-500', 'ring-2', 'ring-red-200');
+      hasError = true;
+    }
+
+    if (hasError) return;
 
     if (btn) {
       btn.innerHTML = `<span class="animate-spin">⏳</span> Authenticating...`;
@@ -1192,7 +1336,7 @@ const App = {
     }
 
     try {
-      const res = await ApiClient.login(email, password);
+      const res = await ApiClient.login(emailOrPhone, password);
       store.setUser(res.user);
       document.getElementById('auth-modal')?.classList.add('hidden');
       
@@ -1204,7 +1348,12 @@ const App = {
         store.setView('customer');
       }
     } catch (err) {
-      alert(`Login failed: ${err.message}`);
+      if (loginErr) {
+        loginErr.textContent = err.message || 'Authentication failed. Please check your credentials.';
+        loginErr.classList.remove('hidden');
+      } else {
+        alert(`Login failed: ${err.message}`);
+      }
     } finally {
       if (btn) {
         btn.innerHTML = `Sign In to Account`;

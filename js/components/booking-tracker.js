@@ -19,8 +19,14 @@ const BookingTrackerComponent = {
             </div>
 
             <!-- Booking Search Input -->
-            <div class="flex items-center gap-2 w-full sm:w-auto">
-              <input type="text" id="track-id-input" value="${store.trackingBookingId || ''}" placeholder="Enter SIRI-XXXXXX" class="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-mono font-bold uppercase focus:ring-2 focus:ring-teal-500 focus:outline-none w-full sm:w-44">
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+              <div class="relative flex-1 sm:w-56">
+                <input type="text" id="track-id-input" value="${store.trackingBookingId || ''}" 
+                  onkeydown="if(event.key==='Enter') BookingTrackerComponent.searchBooking()"
+                  placeholder="Enter SIRI-XXXXXX" 
+                  class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-mono font-bold uppercase focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                <div id="track-search-error" class="hidden absolute top-full left-0 mt-1 text-[11px] text-red-600 font-bold bg-white px-2 py-0.5 rounded shadow-md border border-red-200 z-10 whitespace-nowrap"></div>
+              </div>
               <button onclick="BookingTrackerComponent.searchBooking()" class="px-5 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-sm shadow-md transition-colors flex-shrink-0">
                 Track
               </button>
@@ -68,7 +74,29 @@ const BookingTrackerComponent = {
     `;
   },
 
-  renderBookingDetails(b) {
+  sanitizeBooking(b) {
+    if (!b) return null;
+    let addr = b.address;
+    if (typeof addr === 'string') {
+      try { addr = JSON.parse(addr); } catch (e) { addr = {}; }
+    } else if (!addr && b.address_json) {
+      try { addr = JSON.parse(b.address_json); } catch (e) { addr = {}; }
+    }
+    b.address = addr || {};
+    if (!b.address.house_flat) b.address.house_flat = '';
+    if (!b.address.street) b.address.street = '';
+    if (!b.address.area) b.address.area = 'Hyderabad';
+    if (!b.address.city) b.address.city = 'Hyderabad';
+    if (!b.address.pincode) b.address.pincode = '500034';
+    if (!Array.isArray(b.items)) b.items = [];
+    if (!b.status) b.status = 'confirmed';
+    return b;
+  },
+
+  renderBookingDetails(rawB) {
+    const b = this.sanitizeBooking(rawB);
+    if (!b) return this.renderInitialSearchPrompt();
+
     const statuses = [
       { key: 'received', title: 'Booking Received', desc: 'Order details recorded in system' },
       { key: 'confirmed', title: 'Booking Confirmed', desc: 'Equipment & inventory allocated' },
@@ -170,7 +198,7 @@ const BookingTrackerComponent = {
 
           <div class="mt-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs pt-3 border-t border-slate-100 text-slate-600">
             <div>
-              <span class="font-bold text-slate-800">Doorstep:</span> ${b.address.house_flat || ''}, ${b.address.area || 'Hyderabad'}, ${b.address.city || 'Hyderabad'}
+              <span class="font-bold text-slate-800">Doorstep:</span> ${b.address?.house_flat ? b.address.house_flat + ', ' : ''}${b.address?.street ? b.address.street + ', ' : ''}${b.address?.area || 'Hyderabad'}, ${b.address?.city || 'Hyderabad'}${b.address?.pincode ? ' - ' + b.address.pincode : ''}
             </div>
             <div class="font-mono text-teal-700 font-bold">
               Scheduled Slot: ${b.service_date} (${b.service_slot})
@@ -240,7 +268,7 @@ const BookingTrackerComponent = {
             <div class="flex items-center justify-between py-2 border-b border-slate-100">
               <span class="text-xs text-slate-500">Service Location</span>
               <span class="text-xs font-semibold text-slate-800 text-right max-w-[220px]">
-                ${b.address.house_flat}, ${b.address.area}, ${b.address.city}
+                ${b.address?.house_flat ? b.address.house_flat + ', ' : ''}${b.address?.street ? b.address.street + ', ' : ''}${b.address?.area || 'Hyderabad'}, ${b.address?.city || 'Hyderabad'}${b.address?.pincode ? ' - ' + b.address.pincode : ''}
               </span>
             </div>
 
@@ -282,14 +310,19 @@ const BookingTrackerComponent = {
 
   async loadBooking(bookingId) {
     const host = document.getElementById('tracker-content-host');
+    const input = document.getElementById('track-id-input');
+    const errEl = document.getElementById('track-search-error');
+    if (input && bookingId) input.value = bookingId;
+    if (errEl) errEl.classList.add('hidden');
     if (host) host.innerHTML = BookingTrackerComponent.renderLoadingState();
 
     try {
       const res = await ApiClient.getBookingById(bookingId);
-      this.currentBooking = res.booking;
-      if (host) host.innerHTML = BookingTrackerComponent.renderBookingDetails(res.booking);
+      const sanitized = this.sanitizeBooking(res.booking);
+      this.currentBooking = sanitized;
+      if (host) host.innerHTML = BookingTrackerComponent.renderBookingDetails(sanitized);
       setTimeout(() => {
-        BookingTrackerComponent.initTrackingMap(res.booking);
+        BookingTrackerComponent.initTrackingMap(sanitized);
       }, 80);
     } catch (err) {
       if (host) {
@@ -297,7 +330,7 @@ const BookingTrackerComponent = {
           <div class="bg-white rounded-3xl p-10 text-center border border-slate-200">
             <div class="text-3xl mb-2">🔍</div>
             <h4 class="text-lg font-bold text-slate-900">Booking ${bookingId} not found</h4>
-            <p class="text-xs text-slate-500 mt-1">Please double check your booking reference code or create a new booking.</p>
+            <p class="text-xs text-slate-500 mt-1">Please double check your booking reference code (e.g. SIRI-123456) or create a new booking.</p>
           </div>
         `;
       }
@@ -306,17 +339,38 @@ const BookingTrackerComponent = {
 
   searchBooking() {
     const input = document.getElementById('track-id-input');
+    const errEl = document.getElementById('track-search-error');
     if (!input) return;
-    const id = input.value.trim().toUpperCase();
-    if (id) {
-      store.trackingBookingId = id;
-      this.loadBooking(id);
+    let id = input.value.trim().toUpperCase();
+    if (!id) {
+      if (errEl) {
+        errEl.textContent = 'Please enter a Booking ID (e.g. SIRI-123456)';
+        errEl.classList.remove('hidden');
+      }
+      input.focus();
+      return;
     }
+    // Auto prefix SIRI- if 6 digits or raw alphanumeric without prefix
+    if (/^\d{6}$/.test(id)) {
+      id = 'SIRI-' + id;
+      input.value = id;
+    } else if (!id.startsWith('SIRI-') && /^[A-Z0-9]+$/.test(id)) {
+      id = 'SIRI-' + id;
+      input.value = id;
+    }
+    if (errEl) errEl.classList.add('hidden');
+    store.trackingBookingId = id;
+    this.loadBooking(id);
   },
 
   openInvoice(bookingId) {
     if (!this.currentBooking) return;
     const b = this.currentBooking;
+    const subtotal = b.subtotal || b.total_amount || 0;
+    const discount = b.discount || 0;
+    const serviceCharge = b.service_charge || 49;
+    const tax = b.tax || Math.round(subtotal * 0.18);
+    const totalAmount = b.total_amount || (subtotal - discount + serviceCharge + tax);
     
     const invoiceHtml = `
       <div id="invoice-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
@@ -335,7 +389,7 @@ const BookingTrackerComponent = {
 
           <div class="text-xs text-slate-600 mb-4">
             <strong>Billed To:</strong> ${b.customer_name} (${b.customer_phone})<br>
-            ${b.address.house_flat}, ${b.address.area}, ${b.address.city} - ${b.address.pincode}
+            ${b.address?.house_flat ? b.address.house_flat + ', ' : ''}${b.address?.street ? b.address.street + ', ' : ''}${b.address?.area || 'Hyderabad'}, ${b.address?.city || 'Hyderabad'}${b.address?.pincode ? ' - ' + b.address.pincode : ''}
           </div>
 
           <table class="w-full text-xs text-left border-collapse mb-4">
@@ -349,7 +403,7 @@ const BookingTrackerComponent = {
             <tbody class="divide-y divide-slate-100">
               ${(b.items || []).map(it => `
                 <tr>
-                  <td class="py-2 font-medium">${it.variant_name} (${it.service_name})</td>
+                  <td class="py-2 font-medium">${it.variant_name} (${it.service_name || 'Cleaning'})</td>
                   <td class="py-2 text-center">${it.quantity}</td>
                   <td class="py-2 text-right font-bold">₹${it.total_price}</td>
                 </tr>
@@ -358,13 +412,13 @@ const BookingTrackerComponent = {
           </table>
 
           <div class="border-t border-slate-200 pt-3 space-y-1.5 text-xs text-slate-600">
-            <div class="flex justify-between"><span>Subtotal:</span><span>₹${b.subtotal}</span></div>
-            ${b.discount > 0 ? `<div class="flex justify-between text-emerald-600"><span>Discount:</span><span>− ₹${b.discount}</span></div>` : ''}
-            <div class="flex justify-between"><span>Service Fee:</span><span>₹${b.service_charge}</span></div>
-            <div class="flex justify-between"><span>GST (18%):</span><span>₹${b.tax}</span></div>
+            <div class="flex justify-between"><span>Subtotal:</span><span>₹${subtotal}</span></div>
+            ${discount > 0 ? `<div class="flex justify-between text-emerald-600"><span>Discount:</span><span>− ₹${discount}</span></div>` : ''}
+            <div class="flex justify-between"><span>Service Fee:</span><span>₹${serviceCharge}</span></div>
+            <div class="flex justify-between"><span>GST (18%):</span><span>₹${tax}</span></div>
             <div class="flex justify-between font-black text-sm text-slate-900 pt-2 border-t">
               <span>Total Paid / Payable:</span>
-              <span class="text-teal-700">₹${b.total_amount}</span>
+              <span class="text-teal-700">₹${totalAmount}</span>
             </div>
           </div>
 
@@ -383,6 +437,11 @@ const BookingTrackerComponent = {
   },
 
   openRescheduleModal(bookingId) {
+    const today = new Date().toISOString().split('T')[0];
+    const defaultDate = (this.currentBooking && this.currentBooking.service_date && this.currentBooking.service_date >= today) 
+      ? this.currentBooking.service_date 
+      : (store.getDefaultDate() || today);
+
     const modalHtml = `
       <div id="reschedule-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
         <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
@@ -391,13 +450,14 @@ const BookingTrackerComponent = {
 
           <div class="space-y-4">
             <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1">New Date</label>
-              <input type="date" id="reschedule-date" value="${store.getDefaultDate()}" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold">
+              <label class="block text-xs font-bold text-slate-700 mb-1">New Service Date *</label>
+              <input type="date" id="reschedule-date" min="${today}" value="${defaultDate}" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold focus:ring-2 focus:ring-teal-500 focus:outline-none">
+              <div id="reschedule-err" class="hidden text-xs text-red-600 font-bold mt-1"></div>
             </div>
 
             <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1">New Time Slot</label>
-              <select id="reschedule-slot" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold bg-white">
+              <label class="block text-xs font-bold text-slate-700 mb-1">New Time Slot *</label>
+              <select id="reschedule-slot" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold bg-white focus:ring-2 focus:ring-teal-500 focus:outline-none">
                 <option value="09:00 AM">09:00 AM</option>
                 <option value="11:00 AM">11:00 AM</option>
                 <option value="01:00 PM">01:00 PM</option>
@@ -424,15 +484,35 @@ const BookingTrackerComponent = {
   async confirmReschedule(bookingId) {
     const newDate = document.getElementById('reschedule-date')?.value;
     const newSlot = document.getElementById('reschedule-slot')?.value;
-    if (!newDate || !newSlot) return;
+    const errEl = document.getElementById('reschedule-err');
+    if (errEl) errEl.classList.add('hidden');
+
+    const today = new Date().toISOString().split('T')[0];
+    if (!newDate) {
+      if (errEl) { errEl.textContent = "Please choose a valid service date."; errEl.classList.remove('hidden'); }
+      return;
+    }
+    if (newDate < today) {
+      if (errEl) { errEl.textContent = "Service date cannot be in the past."; errEl.classList.remove('hidden'); }
+      return;
+    }
+    if (!newSlot) {
+      if (errEl) { errEl.textContent = "Please select a preferred time slot."; errEl.classList.remove('hidden'); }
+      return;
+    }
 
     try {
       await ApiClient.rescheduleBooking(bookingId, newDate, newSlot);
-      alert("Booking successfully rescheduled!");
+      alert("✅ Booking successfully rescheduled!");
       document.getElementById('reschedule-modal')?.remove();
       this.loadBooking(bookingId);
     } catch (err) {
-      alert(`Reschedule failed: ${err.message}`);
+      if (errEl) {
+        errEl.textContent = `Reschedule failed: ${err.message}`;
+        errEl.classList.remove('hidden');
+      } else {
+        alert(`Reschedule failed: ${err.message}`);
+      }
     }
   },
 
@@ -449,6 +529,9 @@ const BookingTrackerComponent = {
         console.warn("Tracker map cleanup notice", e);
       }
       this.map = null;
+    }
+    if (mapEl._leaflet_id) {
+      mapEl._leaflet_id = null;
     }
 
     const hydAreaCoords = {
