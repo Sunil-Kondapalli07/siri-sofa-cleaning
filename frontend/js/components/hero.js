@@ -76,7 +76,9 @@ const HeroComponent = {
                 </div>
               </div>
 
-                  <!-- Right Column: Premium Hero Photography & Highlights -->
+            </div>
+
+            <!-- Right Column: Premium Hero Photography & Highlights -->
             <div class="lg:col-span-6 relative">
               <div class="relative rounded-3xl overflow-hidden shadow-2xl border border-black/8 bg-white group">
                 
