@@ -12,19 +12,19 @@ const CustomerPortalComponent = {
     const upcoming = this.customerBookings.find(b => b.status !== 'completed' && b.status !== 'cancelled') || this.customerBookings[0];
 
     return `
-      <section class="py-10 bg-slate-50 min-h-screen">
+      <section class="py-10 bg-[#FAF9F6] min-h-screen">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
           <!-- Top Welcome Header -->
-          <div class="bg-gradient-to-r from-teal-900 to-slate-900 rounded-3xl p-6 sm:p-10 text-white shadow-xl mb-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div class="bg-[#121820] rounded-3xl p-6 sm:p-10 text-white shadow-xl mb-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-[#0C4A34]/30">
             <div class="flex items-center gap-5">
-              <div class="w-16 h-16 rounded-2xl bg-teal-500/20 text-teal-300 flex items-center justify-center font-display font-black text-2xl border border-teal-400/30">
+              <div class="w-16 h-16 rounded-2xl bg-[#0C4A34]/40 text-[#FAF9F6] flex items-center justify-center font-display font-black text-2xl border border-[#0C4A34]/50 shadow-inner">
                 ${user.name ? user.name.charAt(0).toUpperCase() : 'C'}
               </div>
               <div>
-                <span class="text-xs text-teal-400 font-bold uppercase tracking-wider">Customer Portal</span>
+                <span class="text-xs text-emerald-400 font-bold uppercase tracking-wider">Customer Portal</span>
                 <h1 class="text-2xl sm:text-3xl font-extrabold mt-0.5">Welcome, ${user.name || 'Valued Customer'} 👋</h1>
-                <p class="text-xs text-slate-300 mt-1">${user.email || 'No email provided'} • ${user.phone || 'Hyderabad'}</p>
+                <p class="text-xs text-stone-400 mt-1">${user.email || 'No email provided'} • ${user.phone || 'Hyderabad'}</p>
                 
                 <!-- Live Verification Status Badges -->
                 <div class="mt-3 flex flex-wrap items-center gap-2">
@@ -54,7 +54,7 @@ const CustomerPortalComponent = {
             </div>
 
             <div class="flex items-center gap-3">
-              <button onclick="store.setView('book')" class="px-5 py-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-white font-bold text-sm shadow-lg shadow-teal-500/20 transition-all flex items-center gap-2">
+              <button onclick="store.setView('book')" class="px-5 py-3 rounded-xl bg-[#0C4A34] hover:bg-[#083324] text-white font-bold text-sm shadow-lg shadow-[#0C4A34]/30 transition-all flex items-center gap-2 transform hover:-translate-y-0.5">
                 <span>Book New Service</span>
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
               </button>
@@ -62,17 +62,17 @@ const CustomerPortalComponent = {
           </div>
 
           <!-- Customer Navigation Tabs -->
-          <div class="flex items-center gap-2 border-b border-slate-200 mb-8 pb-3 overflow-x-auto">
-            <button onclick="CustomerPortalComponent.switchTab('dashboard')" class="px-4 py-2 rounded-xl text-sm font-bold transition-colors ${this.activeTab === 'dashboard' ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}">
+          <div class="flex items-center gap-2 border-b border-stone-200 mb-8 pb-3 overflow-x-auto">
+            <button onclick="CustomerPortalComponent.switchTab('dashboard')" class="px-4 py-2 rounded-xl text-sm font-bold transition-colors ${this.activeTab === 'dashboard' ? 'bg-[#0C4A34] text-white shadow-sm' : 'text-stone-600 hover:bg-stone-100'}">
               Overview Dashboard
             </button>
-            <button onclick="CustomerPortalComponent.switchTab('bookings')" class="px-4 py-2 rounded-xl text-sm font-bold transition-colors ${this.activeTab === 'bookings' ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}">
+            <button onclick="CustomerPortalComponent.switchTab('bookings')" class="px-4 py-2 rounded-xl text-sm font-bold transition-colors ${this.activeTab === 'bookings' ? 'bg-[#0C4A34] text-white shadow-sm' : 'text-stone-600 hover:bg-stone-100'}">
               My Bookings (${this.customerBookings.length})
             </button>
-            <button onclick="CustomerPortalComponent.switchTab('addresses')" class="px-4 py-2 rounded-xl text-sm font-bold transition-colors ${this.activeTab === 'addresses' ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}">
+            <button onclick="CustomerPortalComponent.switchTab('addresses')" class="px-4 py-2 rounded-xl text-sm font-bold transition-colors ${this.activeTab === 'addresses' ? 'bg-[#0C4A34] text-white shadow-sm' : 'text-stone-600 hover:bg-stone-100'}">
               Saved Addresses
             </button>
-            <button onclick="CustomerPortalComponent.switchTab('profile')" class="px-4 py-2 rounded-xl text-sm font-bold transition-colors ${this.activeTab === 'profile' ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}">
+            <button onclick="CustomerPortalComponent.switchTab('profile')" class="px-4 py-2 rounded-xl text-sm font-bold transition-colors ${this.activeTab === 'profile' ? 'bg-[#0C4A34] text-white shadow-sm' : 'text-stone-600 hover:bg-stone-100'}">
               Profile & Support
             </button>
           </div>

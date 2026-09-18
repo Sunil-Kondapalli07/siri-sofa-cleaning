@@ -11,36 +11,28 @@ const BookingWizardComponent = {
     const calc = store.getCartCalculations();
 
     return `
-      <section class="py-12 bg-slate-50 min-h-screen">
+      <section class="py-12 bg-[#FAF9F6] min-h-screen">
         <div class="max-w-4xl mx-auto px-4 sm:px-6">
           
           <!-- Wizard Card Container -->
-          <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-200/80 overflow-hidden">
+          <div class="bg-white rounded-3xl shadow-xl border border-black/8 overflow-hidden">
             
             <!-- Stepper Progress Bar Header -->
-            <div class="bg-slate-900 text-white p-6 sm:p-8">
+            <div class="bg-white border-b border-black/8 p-6 sm:p-8">
               <div class="flex items-center justify-between mb-4">
                 <div>
-                  <span class="text-teal-400 font-bold text-xs uppercase tracking-wider">Step ${step} of 5</span>
-                  <h2 class="text-2xl font-black text-white mt-0.5">${BookingWizardComponent.getStepTitle(step)}</h2>
+                  <span class="text-[#0C4A34] font-extrabold text-[11px] uppercase tracking-widest bg-[#EBF5F0] px-3 py-1 rounded-full border border-[#C2E2D3]">Step ${step} of 5</span>
+                  <h2 class="text-2xl sm:text-3xl font-black text-[#121820] mt-2">${BookingWizardComponent.getStepTitle(step)}</h2>
                 </div>
                 <div class="text-right hidden sm:block">
-                  <div class="text-xs text-slate-400">Estimated Total</div>
-                  <div class="text-xl font-extrabold text-teal-400">₹${calc.total}</div>
+                  <div class="text-xs font-bold text-[#8490A0]">Estimated Total</div>
+                  <div class="text-2xl font-display font-black text-[#0C4A34]">₹${calc.total}</div>
                 </div>
               </div>
 
-              <!-- Stepper Indicator -->
-              <div class="flex items-center gap-2">
-                ${[1, 2, 3, 4, 5].map(s => {
-                  const isDone = s < step;
-                  const isCurrent = s === step;
-                  return `
-                    <div class="flex-1 flex flex-col items-center">
-                      <div class="w-full h-2 rounded-full transition-all ${isDone ? 'bg-teal-400' : (isCurrent ? 'bg-teal-500 ring-2 ring-teal-300' : 'bg-slate-700')}"></div>
-                    </div>
-                  `;
-                }).join('')}
+              <!-- Stepper Progress Bar -->
+              <div class="w-full bg-[#F4F2EC] h-2 rounded-full overflow-hidden">
+                <div class="bg-[#0C4A34] h-full rounded-full transition-all duration-300" style="width: ${(step / 5) * 100}%;"></div>
               </div>
             </div>
 
@@ -50,28 +42,28 @@ const BookingWizardComponent = {
             </div>
 
             <!-- Wizard Step Navigation Buttons -->
-            <div class="bg-slate-50 border-t border-slate-200/80 px-6 sm:px-10 py-5 flex items-center justify-between">
+            <div class="bg-[#FAF9F6] border-t border-black/8 px-6 sm:px-10 py-5 flex items-center justify-between">
               ${step > 1 ? `
-                <button onclick="BookingWizardComponent.prevStep()" class="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-200 transition-colors text-sm flex items-center gap-1.5">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                <button onclick="BookingWizardComponent.prevStep()" class="btn-secondary text-xs py-2.5 px-6 flex items-center gap-1.5">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
                   <span>Back</span>
                 </button>
               ` : `<div></div>`}
 
               ${step < 5 ? `
-                <button onclick="BookingWizardComponent.nextStep()" class="px-7 py-3 rounded-xl font-bold text-white bg-teal-600 hover:bg-teal-500 shadow-md shadow-teal-600/20 transition-all text-sm flex items-center gap-2">
+                <button onclick="BookingWizardComponent.nextStep()" class="btn-primary text-xs py-3 px-8 flex items-center gap-2">
                   <span>Continue</span>
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
                 </button>
               ` : (store.currentUser ? `
-                <button id="confirm-booking-btn" onclick="BookingWizardComponent.submitBooking()" class="px-8 py-3.5 rounded-xl font-black text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-xl shadow-teal-600/25 transition-all text-base flex items-center gap-2">
+                <button id="confirm-booking-btn" onclick="BookingWizardComponent.submitBooking()" class="btn-primary text-xs py-3.5 px-8 shadow-xl flex items-center gap-2">
                   <span>Confirm & Schedule Cleaning</span>
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                 </button>
               ` : `
-                <button id="confirm-booking-btn" onclick="BookingWizardComponent.promptAuthBeforeBooking()" class="px-8 py-3.5 rounded-xl font-black text-white bg-amber-600 hover:bg-amber-500 shadow-xl shadow-amber-600/25 transition-all text-base flex items-center gap-2">
+                <button id="confirm-booking-btn" onclick="BookingWizardComponent.promptAuthBeforeBooking()" class="px-7 py-3 rounded-full font-bold text-white bg-[#121820] hover:bg-black shadow-lg text-xs flex items-center gap-2">
                   <span>🔒 Sign In to Confirm Appointment</span>
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                 </button>
               `)}
             </div>
@@ -1000,30 +992,60 @@ const BookingWizardComponent = {
   },
 
   renderSuccessModal(bookingId, total) {
+    const serviceDate = store.wizard.serviceDate || 'Tomorrow';
+    const serviceSlot = store.wizard.serviceSlot || '10:30 AM';
+
     const modalHtml = `
-      <div id="booking-success-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm animate-fade-in">
-        <div class="bg-white rounded-3xl max-w-md w-full p-8 text-center shadow-2xl border border-slate-100">
-          <div class="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-4 text-2xl animate-bounce-short">
-            🎉
-          </div>
-          <h3 class="text-2xl font-black text-slate-900">Booking Confirmed!</h3>
-          <p class="text-slate-500 text-sm mt-1">Your professional cleaning appointment has been scheduled.</p>
+      <div id="booking-success-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
+        <div class="bg-white rounded-3xl max-w-md w-full p-8 text-center shadow-2xl border border-black/8">
           
-          <div class="my-6 p-4 rounded-2xl bg-teal-50 border border-teal-200">
-            <div class="text-xs text-teal-800 font-semibold uppercase">Booking Tracking ID</div>
-            <div class="text-2xl font-mono font-black text-teal-900 tracking-wider mt-1">${bookingId}</div>
-            <div class="text-xs text-teal-700 font-bold mt-2">Total Amount: ₹${total} (Cash/UPI upon completion)</div>
+          <!-- Animated Checkmark Circle -->
+          <div class="w-16 h-16 rounded-full bg-[#EBF5F0] text-[#0C4A34] flex items-center justify-center mx-auto mb-5 text-2xl border-2 border-[#C2E2D3] shadow-sm">
+            <svg class="w-8 h-8 text-[#0C4A34]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+            </svg>
           </div>
 
-          <div class="space-y-3">
-            <button onclick="BookingWizardComponent.closeSuccessModalAndTrack('${bookingId}')" class="w-full py-3.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-sm shadow-lg shadow-teal-600/20 transition-all flex items-center justify-center gap-2">
+          <span class="text-[11px] font-extrabold uppercase tracking-widest text-[#0C4A34] bg-[#EBF5F0] px-3 py-1 rounded-full border border-[#C2E2D3]">
+            ✓ Confirmed Appointment
+          </span>
+
+          <h3 class="text-2xl font-black text-[#121820] mt-3">Booking Confirmed</h3>
+          <p class="text-xs text-[#525D6C] mt-1.5 leading-relaxed">
+            Your cleaning service has been successfully scheduled with our Hyderabad specialist team.
+          </p>
+          
+          <!-- Booking Reference Card -->
+          <div class="my-6 p-4 rounded-2xl bg-[#FAF9F6] border border-black/8 text-left space-y-2">
+            <div class="flex justify-between items-center pb-2 border-b border-black/5">
+              <span class="text-[11px] font-bold uppercase text-[#8490A0]">Booking ID</span>
+              <span class="font-mono font-black text-sm text-[#121820]">${bookingId}</span>
+            </div>
+            <div class="flex justify-between items-center text-xs text-[#525D6C]">
+              <span>Scheduled Date</span>
+              <span class="font-bold text-[#121820]">${serviceDate}</span>
+            </div>
+            <div class="flex justify-between items-center text-xs text-[#525D6C]">
+              <span>Time Window</span>
+              <span class="font-bold text-[#121820]">${serviceSlot}</span>
+            </div>
+            <div class="flex justify-between items-center pt-2 border-t border-black/5 text-xs text-[#121820] font-black">
+              <span>Payable After Inspection</span>
+              <span class="text-[#0C4A34] text-sm">₹${total}</span>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="space-y-2.5">
+            <button onclick="BookingWizardComponent.closeSuccessModalAndTrack('${bookingId}')" class="btn-primary w-full text-xs py-3.5 shadow-md flex items-center justify-center gap-2">
               <span>Track Live Booking Status</span>
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
             </button>
-            <button onclick="document.getElementById('booking-success-modal').remove(); store.trackingBookingId = null; store.setView('home');" class="w-full py-2.5 text-slate-500 hover:text-slate-800 text-xs font-semibold">
-              Return to Home
+            <button onclick="document.getElementById('booking-success-modal').remove(); store.trackingBookingId = null; store.setView('home');" class="btn-secondary w-full text-xs py-3">
+              Back to Home
             </button>
           </div>
+
         </div>
       </div>
     `;
