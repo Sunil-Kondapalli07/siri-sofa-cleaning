@@ -19,13 +19,13 @@ const AdminPortalComponent = {
           <!-- Admin Navbar Header -->
           <div class="bg-slate-800/90 border border-slate-700/80 rounded-3xl p-6 mb-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
             <div class="flex items-center gap-4">
-              <div class="w-12 h-12 rounded-2xl bg-teal-500 text-slate-950 font-black text-xl flex items-center justify-center shadow-lg shadow-teal-500/20">
+              <div class="w-12 h-12 rounded-2xl bg-[#0C4A34] text-white font-black text-xl flex items-center justify-center shadow-lg shadow-[#0C4A34]/40 border border-emerald-500/30">
                 ⚡
               </div>
               <div>
                 <div class="flex items-center gap-2">
                   <h1 class="text-2xl font-black text-white">Siri Operations HQ</h1>
-                  <span class="px-2.5 py-0.5 rounded-full bg-teal-500/20 border border-teal-400/40 text-teal-300 text-[10px] font-mono font-bold uppercase">
+                  <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[10px] font-mono font-bold uppercase">
                     Admin Portal
                   </span>
                 </div>
@@ -35,19 +35,19 @@ const AdminPortalComponent = {
 
             <!-- Admin Nav Tabs -->
             <div class="flex flex-wrap items-center gap-1.5 bg-slate-950/60 p-1.5 rounded-2xl border border-slate-700/60 text-xs font-bold">
-              <button onclick="AdminPortalComponent.switchTab('dashboard')" class="px-3 py-2 rounded-xl transition-all ${this.activeTab === 'dashboard' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}">
+              <button onclick="AdminPortalComponent.switchTab('dashboard')" class="px-3 py-2 rounded-xl transition-all ${this.activeTab === 'dashboard' ? 'bg-[#0C4A34] text-white shadow-sm' : 'text-slate-400 hover:text-white'}">
                 Dashboard
               </button>
-              <button onclick="AdminPortalComponent.switchTab('bookings')" class="px-3 py-2 rounded-xl transition-all ${this.activeTab === 'bookings' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}">
+              <button onclick="AdminPortalComponent.switchTab('bookings')" class="px-3 py-2 rounded-xl transition-all ${this.activeTab === 'bookings' ? 'bg-[#0C4A34] text-white shadow-sm' : 'text-slate-400 hover:text-white'}">
                 Bookings
               </button>
-              <button onclick="AdminPortalComponent.switchTab('pricing')" class="px-3 py-2 rounded-xl transition-all ${this.activeTab === 'pricing' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}">
+              <button onclick="AdminPortalComponent.switchTab('pricing')" class="px-3 py-2 rounded-xl transition-all ${this.activeTab === 'pricing' ? 'bg-[#0C4A34] text-white shadow-sm' : 'text-slate-400 hover:text-white'}">
                 💰 Dynamic Pricing
               </button>
-              <button onclick="AdminPortalComponent.switchTab('technicians')" class="px-3 py-2 rounded-xl transition-all ${this.activeTab === 'technicians' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}">
+              <button onclick="AdminPortalComponent.switchTab('technicians')" class="px-3 py-2 rounded-xl transition-all ${this.activeTab === 'technicians' ? 'bg-[#0C4A34] text-white shadow-sm' : 'text-slate-400 hover:text-white'}">
                 👨‍🔧 Technicians
               </button>
-              <button onclick="AdminPortalComponent.switchTab('analytics')" class="px-3 py-2 rounded-xl transition-all ${this.activeTab === 'analytics' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}">
+              <button onclick="AdminPortalComponent.switchTab('analytics')" class="px-3 py-2 rounded-xl transition-all ${this.activeTab === 'analytics' ? 'bg-[#0C4A34] text-white shadow-sm' : 'text-slate-400 hover:text-white'}">
                 📈 Analytics
               </button>
             </div>

@@ -1,102 +1,156 @@
 /**
- * Navbar Component
+ * Siri Sofa Services — Modern Sticky Luxury Navigation Bar
  */
 
 const NavbarComponent = {
+  mobileMenuOpen: false,
+
   render() {
     const user = store.currentUser;
     const currentView = store.currentView;
 
     return `
-      <header class="sticky top-0 z-50 glass-panel border-b border-slate-200/80 transition-all">
+      <header id="main-header" class="sticky top-0 z-50 glass-nav transition-all duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div class="flex items-center justify-between h-20">
+            
             <!-- Brand Logo -->
-            <div class="flex items-center gap-3 cursor-pointer" onclick="store.setView('home')">
-              <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-teal-700 to-teal-500 flex items-center justify-center text-white shadow-lg shadow-teal-700/20 transform hover:scale-105 transition-transform">
-                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="flex items-center gap-3 cursor-pointer group" onclick="store.setView('home')">
+              <div class="w-11 h-11 rounded-2xl bg-[#0C4A34] flex items-center justify-center text-white shadow-md shadow-[#0C4A34]/20 group-hover:scale-105 transition-transform">
+                <svg class="w-6 h-6 text-[#EBF5F0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                 </svg>
               </div>
-              <div>
-                <span class="font-display font-bold text-2xl tracking-tight text-slate-900 flex items-center gap-1.5">
-                  Siri <span class="text-teal-600">Sofa</span> Services
+              <div class="flex flex-col">
+                <div class="flex items-center gap-1.5">
+                  <span class="font-display font-black text-xl sm:text-2xl tracking-tight text-[#121820]">
+                    SIRI SOFA
+                  </span>
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#0C4A34]"></span>
+                </div>
+                <span class="text-[10px] font-bold text-[#6B7788] tracking-widest uppercase -mt-0.5">
+                  Doorstep Hygiene
                 </span>
-                <p class="text-xs font-medium text-slate-500 tracking-wide uppercase">Fresh Sofa. Fresh Home.</p>
               </div>
             </div>
 
-            <!-- Navigation Links -->
-            <nav class="hidden md:flex items-center gap-1 lg:gap-2">
-              <button onclick="store.setView('home')" class="px-3.5 py-2 rounded-xl text-sm font-semibold transition-colors ${currentView === 'home' ? 'text-teal-700 bg-teal-50' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}">
+            <!-- Desktop Navigation Links -->
+            <nav class="hidden md:flex items-center gap-1 lg:gap-1.5">
+              <button onclick="store.setView('home')" class="px-3.5 py-2 rounded-full text-xs font-bold transition-all ${currentView === 'home' ? 'text-[#0C4A34] bg-[#EBF5F0]' : 'text-[#4A5568] hover:text-[#121820] hover:bg-black/5'}">
                 Home
               </button>
-              <button onclick="store.setView('services')" class="px-3.5 py-2 rounded-xl text-sm font-semibold transition-colors ${currentView === 'services' ? 'text-teal-700 bg-teal-50' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}">
+              <button onclick="store.setView('services')" class="px-3.5 py-2 rounded-full text-xs font-bold transition-all ${currentView === 'services' ? 'text-[#0C4A34] bg-[#EBF5F0]' : 'text-[#4A5568] hover:text-[#121820] hover:bg-black/5'}">
                 Services & Pricing
               </button>
-              <button onclick="store.setView('hygiene')" class="px-3.5 py-2 rounded-xl text-sm font-semibold transition-colors ${currentView === 'hygiene' ? 'text-teal-700 bg-teal-50' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}">
-                Hygiene Process
+              <button onclick="store.setView('hygiene')" class="px-3.5 py-2 rounded-full text-xs font-bold transition-all ${currentView === 'hygiene' ? 'text-[#0C4A34] bg-[#EBF5F0]' : 'text-[#4A5568] hover:text-[#121820] hover:bg-black/5'}">
+                Before / After
               </button>
-              <button onclick="store.setView('track')" class="px-3.5 py-2 rounded-xl text-sm font-semibold transition-colors ${currentView === 'track' ? 'text-teal-700 bg-teal-50' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}">
-                <span class="flex items-center gap-1.5">
+              <button onclick="store.setView('track')" class="px-3.5 py-2 rounded-full text-xs font-bold transition-all ${currentView === 'track' ? 'text-[#0C4A34] bg-[#EBF5F0]' : 'text-[#4A5568] hover:text-[#121820] hover:bg-black/5'}">
+                <span class="inline-flex items-center gap-1.5">
                   <span class="relative flex h-2 w-2">
-                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
-                    <span class="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0C4A34] opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-[#0C4A34]"></span>
                   </span>
                   Track Booking
                 </span>
               </button>
-              <button onclick="store.setView('book')" class="px-3.5 py-2 rounded-xl text-sm font-semibold transition-colors ${currentView === 'book' ? 'text-teal-700 bg-teal-50' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}">
-                Book Cleaning
-              </button>
             </nav>
 
-            <!-- Actions & Auth -->
-            <div class="flex items-center gap-3">
+            <!-- Actions & Auth Controls -->
+            <div class="hidden sm:flex items-center gap-3">
               ${user ? `
-                <div class="relative flex items-center gap-2">
+                <div class="flex items-center gap-2">
                   ${user.role === 'admin' ? `
-                    <button onclick="store.setView('admin')" class="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-teal-600 bg-teal-800 text-white hover:bg-teal-700 transition-all shadow-sm">
+                    <button onclick="store.setView('admin')" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#121820] text-white hover:bg-black transition-all shadow-sm text-xs font-bold">
                       <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                      <span class="text-xs font-bold">⚡ Operations HQ</span>
+                      <span>HQ Operations</span>
                     </button>
                   ` : `
-                    <button onclick="store.setView('customer')" class="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:border-teal-300 transition-all shadow-sm">
-                      <div class="w-8 h-8 rounded-lg bg-teal-100 text-teal-800 font-bold flex items-center justify-center text-sm">
-                        ${user.name.charAt(0)}
+                    <button onclick="store.setView('customer')" class="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-black/10 bg-white hover:border-[#0C4A34]/40 transition-all shadow-sm">
+                      <div class="w-6 h-6 rounded-full bg-[#EBF5F0] text-[#0C4A34] font-bold flex items-center justify-center text-xs">
+                        ${(user.name || 'U').charAt(0).toUpperCase()}
                       </div>
-                      <div class="text-left hidden lg:block">
-                        <div class="text-xs font-bold text-slate-800 leading-tight">${user.name}</div>
-                        <div class="text-[10px] text-teal-600 font-semibold">My Account</div>
-                      </div>
+                      <span class="text-xs font-bold text-[#121820] max-w-[100px] truncate">${user.name || 'Account'}</span>
                     </button>
                   `}
-                  <button onclick="NavbarComponent.handleLogout()" title="Logout" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <button onclick="NavbarComponent.handleLogout()" title="Sign Out" class="p-2 text-[#8490A0] hover:text-red-600 hover:bg-red-50 rounded-full transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
                     </svg>
                   </button>
                 </div>
               ` : `
-                <span class="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold">
-                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  📍 Hyderabad Only
-                </span>
-                <button onclick="NavbarComponent.openAuthModal('login')" class="px-3.5 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:text-teal-700 hover:bg-teal-50/50 border border-slate-200 transition-colors">
+                <button onclick="NavbarComponent.openAuthModal('login')" class="px-4 py-2 text-xs font-bold text-[#121820] hover:text-[#0C4A34] transition-colors">
                   Sign In
                 </button>
-                <button onclick="NavbarComponent.openAuthModal('signup')" class="px-3.5 py-2 rounded-xl text-sm font-bold text-slate-900 hover:text-white hover:bg-slate-900 border border-slate-300 transition-all">
-                  Sign Up
-                </button>
-                <button onclick="store.setView('book')" class="hidden sm:inline-flex items-center justify-center px-4 py-2 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600 shadow-md shadow-teal-600/20 transform hover:-translate-y-0.5 transition-all">
-                  Book Now
+                <button onclick="store.setView('book')" class="btn-primary text-xs py-2 px-5">
+                  <span>Book Cleaning</span>
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                 </button>
               `}
             </div>
+
+            <!-- Mobile Hamburger Button -->
+            <div class="flex items-center gap-2 md:hidden">
+              <button onclick="NavbarComponent.toggleMobileMenu()" class="p-2.5 rounded-xl border border-black/10 text-[#121820] hover:bg-black/5 focus:outline-none transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Mobile Drawer Menu -->
+        <div id="mobile-nav-drawer" class="hidden md:hidden border-t border-black/5 bg-[#FAF9F6]/95 backdrop-blur-xl px-4 py-4 space-y-2 animate-fade-in">
+          <button onclick="store.setView('home'); NavbarComponent.toggleMobileMenu(false);" class="w-full text-left px-4 py-2.5 rounded-xl text-sm font-bold ${currentView === 'home' ? 'text-[#0C4A34] bg-[#EBF5F0]' : 'text-[#121820]'}">
+            Home
+          </button>
+          <button onclick="store.setView('services'); NavbarComponent.toggleMobileMenu(false);" class="w-full text-left px-4 py-2.5 rounded-xl text-sm font-bold ${currentView === 'services' ? 'text-[#0C4A34] bg-[#EBF5F0]' : 'text-[#121820]'}">
+            Services & Pricing
+          </button>
+          <button onclick="store.setView('hygiene'); NavbarComponent.toggleMobileMenu(false);" class="w-full text-left px-4 py-2.5 rounded-xl text-sm font-bold ${currentView === 'hygiene' ? 'text-[#0C4A34] bg-[#EBF5F0]' : 'text-[#121820]'}">
+            Before / After Comparison
+          </button>
+          <button onclick="store.setView('track'); NavbarComponent.toggleMobileMenu(false);" class="w-full text-left px-4 py-2.5 rounded-xl text-sm font-bold ${currentView === 'track' ? 'text-[#0C4A34] bg-[#EBF5F0]' : 'text-[#121820]'}">
+            Track Booking
+          </button>
+          <div class="pt-2 border-t border-black/5 flex flex-col gap-2">
+            ${user ? `
+              <button onclick="store.setView('${user.role === 'admin' ? 'admin' : 'customer'}'); NavbarComponent.toggleMobileMenu(false);" class="w-full py-2.5 rounded-xl bg-white border border-black/10 text-center text-sm font-bold text-[#121820]">
+                ${user.role === 'admin' ? '⚡ Operations HQ' : 'My Account Dashboard'}
+              </button>
+              <button onclick="NavbarComponent.handleLogout(); NavbarComponent.toggleMobileMenu(false);" class="w-full py-2.5 rounded-xl text-center text-sm font-bold text-red-600 bg-red-50">
+                Sign Out
+              </button>
+            ` : `
+              <button onclick="NavbarComponent.openAuthModal('login'); NavbarComponent.toggleMobileMenu(false);" class="w-full py-2.5 rounded-xl bg-white border border-black/10 text-center text-sm font-bold text-[#121820]">
+                Sign In
+              </button>
+              <button onclick="store.setView('book'); NavbarComponent.toggleMobileMenu(false);" class="w-full py-3 rounded-full bg-[#0C4A34] text-center text-sm font-bold text-white shadow-md">
+                Book Cleaning Service
+              </button>
+            `}
           </div>
         </div>
       </header>
     `;
+  },
+
+  toggleMobileMenu(forceState) {
+    const drawer = document.getElementById('mobile-nav-drawer');
+    if (!drawer) return;
+    if (typeof forceState === 'boolean') {
+      this.mobileMenuOpen = forceState;
+    } else {
+      this.mobileMenuOpen = !this.mobileMenuOpen;
+    }
+    if (this.mobileMenuOpen) {
+      drawer.classList.remove('hidden');
+    } else {
+      drawer.classList.add('hidden');
+    }
   },
 
   handleLogout() {
