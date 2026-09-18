@@ -793,8 +793,8 @@ const App = {
             </p>
           </div>
 
-          <!-- Real-Time Delivery Notice (No OTP on screen) -->
-          <div class="mb-5 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left flex items-start gap-3">
+          <!-- Real-Time Delivery Notice -->
+          <div id="signup-notice-box" class="mb-5 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left flex items-start gap-3">
             <span class="text-lg">📩</span>
             <div class="text-xs text-slate-700 leading-tight">
               <div class="font-bold text-slate-900">Separate Secure Codes Dispatched</div>
@@ -899,7 +899,7 @@ const App = {
 
   signupPending: null,
 
-  launchSignupDualVerification(user, phone, email) {
+  launchSignupDualVerification(user, phone, email, res = {}) {
     this.signupPending = {
       user: user,
       phone: phone,
@@ -907,7 +907,11 @@ const App = {
       mobileVerified: false,
       emailVerified: false,
       mobileInterval: null,
-      emailInterval: null
+      emailInterval: null,
+      devCodes: {
+        mobile: res.dev_mobile_code || null,
+        email: res.dev_email_code || null
+      }
     };
 
     const modal = document.getElementById('signup-verify-modal');
@@ -917,6 +921,7 @@ const App = {
     const eInput = document.getElementById('signup-email-otp');
     const mErr = document.getElementById('signup-mobile-err');
     const eErr = document.getElementById('signup-email-err');
+    const noticeBox = document.getElementById('signup-notice-box');
 
     if (mTarget) mTarget.innerText = phone ? `+91 ${phone}` : 'No phone provided';
     if (eTarget) eTarget.innerText = email;
@@ -924,6 +929,37 @@ const App = {
     if (eInput) eInput.value = '';
     if (mErr) mErr.classList.add('hidden');
     if (eErr) eErr.classList.add('hidden');
+
+    if (noticeBox) {
+      if (res.dev_mobile_code || res.dev_email_code) {
+        noticeBox.className = 'mb-5 p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-left flex items-start gap-3';
+        noticeBox.innerHTML = `
+          <span class="text-xl">🛡️</span>
+          <div class="text-xs text-amber-900 leading-tight flex-1">
+            <div class="font-bold text-slate-900">Security Verification Codes Generated</div>
+            <p class="text-[11px] text-amber-800 mt-1">
+              ${res.mobile_delivered ? '✅ SMS code delivered live to your mobile.' : 'ℹ️ Live SMS gateway is unconfigured in .env (FAST2SMS_API_KEY required for live carrier delivery).'}
+            </p>
+            <div class="mt-2.5 p-2.5 bg-white rounded-xl border border-amber-200 flex flex-wrap gap-4 font-mono text-xs shadow-sm">
+              ${res.dev_mobile_code ? `<div>📱 Mobile SMS Code: <span class="bg-amber-100 text-slate-950 px-2 py-0.5 rounded font-black tracking-wider">${res.dev_mobile_code}</span></div>` : '<div>📱 Mobile SMS: <span class="text-emerald-700 font-bold">Live Sent</span></div>'}
+              ${res.dev_email_code ? `<div>✉️ Email Code: <span class="bg-amber-100 text-slate-950 px-2 py-0.5 rounded font-black tracking-wider">${res.dev_email_code}</span></div>` : '<div>✉️ Email: <span class="text-emerald-700 font-bold">Live Sent</span></div>'}
+            </div>
+            <div class="text-[10px] text-amber-700 font-semibold mt-1.5">* You must enter these exact codes. Random codes will be rejected.</div>
+          </div>
+        `;
+      } else {
+        noticeBox.className = 'mb-5 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-left flex items-start gap-3';
+        noticeBox.innerHTML = `
+          <span class="text-xl text-emerald-600">✅</span>
+          <div class="text-xs text-emerald-900 leading-tight">
+            <div class="font-bold text-emerald-950">Live 2-Factor Codes Dispatched!</div>
+            <p class="text-[11px] text-emerald-700 mt-0.5">
+              Live codes have been sent to <strong>+91 ${phone}</strong> and <strong>${email}</strong>. Please check your SMS and Email.
+            </p>
+          </div>
+        `;
+      }
+    }
 
     this.resetSignupVerificationUI();
 
@@ -1011,8 +1047,28 @@ const App = {
     }
 
     try {
-      await ApiClient.sendOtp(target, channel, this.signupPending.user?.id);
+      const res = await ApiClient.sendOtp(target, channel, this.signupPending.user?.id);
       this.startSignupCooldown(channel, 30);
+      if (res && res.dev_code) {
+        if (!this.signupPending.devCodes) this.signupPending.devCodes = {};
+        this.signupPending.devCodes[channel] = res.dev_code;
+        const noticeBox = document.getElementById('signup-notice-box');
+        if (noticeBox) {
+          const mCode = channel === 'mobile' ? res.dev_code : (this.signupPending.devCodes.mobile || null);
+          const eCode = channel === 'email' ? res.dev_code : (this.signupPending.devCodes.email || null);
+          noticeBox.className = 'mb-5 p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-left flex items-start gap-3';
+          noticeBox.innerHTML = `
+            <span class="text-xl">🔄</span>
+            <div class="text-xs text-amber-900 leading-tight flex-1">
+              <div class="font-bold text-slate-900">New Verification Code Generated</div>
+              <div class="mt-2 p-2 bg-white rounded-xl border border-amber-200 flex flex-wrap gap-4 font-mono text-xs shadow-sm">
+                ${mCode ? `<div>📱 Mobile SMS: <span class="bg-amber-100 text-slate-950 px-2 py-0.5 rounded font-black">${mCode}</span></div>` : ''}
+                ${eCode ? `<div>✉️ Email: <span class="bg-amber-100 text-slate-950 px-2 py-0.5 rounded font-black">${eCode}</span></div>` : ''}
+              </div>
+            </div>
+          `;
+        }
+      }
     } catch (err) {
       if (errBox) {
         errBox.innerText = err.message || 'Failed to resend code';
@@ -1277,7 +1333,7 @@ const App = {
       store.wizard.address.city = 'Hyderabad';
 
       document.getElementById('auth-modal')?.classList.add('hidden');
-      this.launchSignupDualVerification(res.user, rawPhone, email);
+      this.launchSignupDualVerification(res.user, rawPhone, email, res);
     } catch (err) {
       const errMsg = err.message || 'Registration failed';
       const isAlreadyExists = errMsg.toLowerCase().includes('already exists') || errMsg.toLowerCase().includes('already registered');

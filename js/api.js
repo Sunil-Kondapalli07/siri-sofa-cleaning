@@ -1,8 +1,8 @@
 /**
  * Siri Sofa Services — API Client
- */
-
-const API_BASE = ''; // Same origin
+ */const API_BASE = window.API_BASE 
+  || window.localStorage.getItem('siri_api_base')
+  || (window.location.port && window.location.port !== '8000' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:8000' : '');
 
 const ApiClient = {
   async request(endpoint, options = {}) {
@@ -31,8 +31,9 @@ const ApiClient = {
       }
       return data;
     } catch (err) {
-      // Fallback for static hosting (e.g. GitHub Pages) where backend server is not hosted
-      if (window.location.hostname.includes('github.io') || window.location.protocol === 'file:' || (err.message && (err.message.includes('404') || err.message.includes('Failed to fetch')))) {
+      // Fallback ONLY for static hosting (e.g. GitHub Pages or file: protocol) where no Python backend can run
+      const isStaticEnv = window.location.hostname.includes('github.io') || window.location.protocol === 'file:';
+      if (isStaticEnv) {
         try {
           return this.handleStaticFallback(endpoint, options);
         } catch (fallbackErr) {
@@ -77,34 +78,111 @@ const ApiClient = {
       throw new Error('Invalid coupon code');
     }
     if (endpoint === '/api/auth/register') {
+      const users = JSON.parse(localStorage.getItem('siri_users') || '[]');
+      const regEmail = (body.email || '').trim().toLowerCase();
+      const regPhone = (body.phone || '').replace(/[^0-9]/g, '').slice(-10);
+
+      if (regEmail === 'admin@sirisofa.com' || users.some(u => (u.email || '').toLowerCase() === regEmail)) {
+        throw new Error('User already exists with this email address. Please sign in instead.');
+      }
+      if (regPhone === '9800000000' || users.some(u => (u.phone || '').replace(/[^0-9]/g, '').slice(-10) === regPhone)) {
+        throw new Error('User already exists with this mobile number. Please sign in instead.');
+      }
+
+      const mCode = String(Math.floor(100000 + Math.random() * 900000));
+      const eCode = String(Math.floor(100000 + Math.random() * 900000));
+      const activeOtps = JSON.parse(localStorage.getItem('siri_active_otps') || '{}');
+      if (body.phone) activeOtps[body.phone] = { code: mCode, attempts: 0 };
+      if (body.email) activeOtps[regEmail] = { code: eCode, attempts: 0 };
+      localStorage.setItem('siri_active_otps', JSON.stringify(activeOtps));
+
       const u = {
         id: Date.now(),
         name: body.name || 'Customer',
         email: body.email,
         phone: body.phone,
+        password: body.password,
         role: 'customer',
         is_email_verified: false,
         is_mobile_verified: false
       };
-      return { success: true, user: u, token: 'static_demo_token', requires_verification: true };
+      users.push(u);
+      localStorage.setItem('siri_users', JSON.stringify(users));
+
+      return { 
+        success: true, 
+        user: u, 
+        token: `token_${u.id}_${Date.now()}`, 
+        requires_verification: true,
+        dev_mobile_code: mCode,
+        dev_email_code: eCode,
+        mobile_delivered: false,
+        email_delivered: false,
+        message: 'Account created! Verification codes dispatched.'
+      };
     }
     if (endpoint === '/api/auth/login') {
       const isAdmin = body.email === 'admin@sirisofa.com' && body.password === 'admin123';
-      const u = {
-        id: isAdmin ? 1 : Date.now(),
-        name: isAdmin ? 'Siri Operations Admin' : (body.email?.split('@')[0] || 'Customer'),
-        email: body.email,
-        phone: '+91 98480 12345',
-        role: isAdmin ? 'admin' : 'customer',
+      const users = JSON.parse(localStorage.getItem('siri_users') || '[]');
+      const foundUser = users.find(u => 
+        (u.email && u.email.toLowerCase() === (body.email || '').toLowerCase()) ||
+        (u.phone && u.phone.replace(/[^0-9]/g, '').slice(-10) === (body.email || '').replace(/[^0-9]/g, '').slice(-10))
+      );
+
+      if (!isAdmin && !foundUser) {
+        throw new Error('Invalid email or password. Please check your credentials or create an account.');
+      }
+
+      const u = isAdmin ? {
+        id: 1,
+        name: 'Siri Operations Admin',
+        email: 'admin@sirisofa.com',
+        phone: '+91 98000 00000',
+        role: 'admin',
         is_email_verified: true,
         is_mobile_verified: true
-      };
-      return { success: true, user: u, token: 'static_demo_token' };
+      } : foundUser;
+
+      return { success: true, user: u, token: `token_${u.id}_${Date.now()}` };
     }
     if (endpoint === '/api/auth/otp/send') {
-      return { success: true, message: 'Verification code dispatched' };
+      const target = (body.target || '').trim();
+      const code = String(Math.floor(100000 + Math.random() * 900000));
+      const activeOtps = JSON.parse(localStorage.getItem('siri_active_otps') || '{}');
+      activeOtps[target] = { code: code, attempts: 0 };
+      if (target.includes('@')) activeOtps[target.toLowerCase()] = { code: code, attempts: 0 };
+      localStorage.setItem('siri_demo_otps', JSON.stringify(activeOtps));
+      localStorage.setItem('siri_active_otps', JSON.stringify(activeOtps));
+      return { 
+        success: true, 
+        message: `Verification code sent to ${target}`, 
+        dev_code: code, 
+        delivered: false 
+      };
     }
     if (endpoint === '/api/auth/otp/verify') {
+      const target = (body.target || '').trim();
+      const submittedCode = String(body.otp_code || '').trim();
+      const activeOtps = JSON.parse(localStorage.getItem('siri_active_otps') || '{}');
+      const record = activeOtps[target] || (target.includes('@') ? activeOtps[target.toLowerCase()] : null);
+
+      if (!record) {
+        throw new Error('No active verification code found for this destination. Please request a new code.');
+      }
+      if (record.attempts >= 5) {
+        throw new Error('Maximum verification attempts exceeded. Please request a new code.');
+      }
+      if (record.code !== submittedCode) {
+        record.attempts = (record.attempts || 0) + 1;
+        activeOtps[target] = record;
+        localStorage.setItem('siri_active_otps', JSON.stringify(activeOtps));
+        const remaining = Math.max(0, 5 - record.attempts);
+        throw new Error(`Incorrect verification code. ${remaining} attempts remaining.`);
+      }
+
+      delete activeOtps[target];
+      if (target.includes('@')) delete activeOtps[target.toLowerCase()];
+      localStorage.setItem('siri_active_otps', JSON.stringify(activeOtps));
       return { success: true, message: 'Verified successfully' };
     }
     if (endpoint === '/api/bookings' && method === 'POST') {
@@ -121,6 +199,7 @@ const ApiClient = {
       }
       const b = {
         id: bookingId,
+        user_id: curUser ? curUser.id : (body.user_id || null),
         customer_name: body.customer_name || body.name || (curUser ? curUser.name : 'Customer'),
         customer_phone: body.customer_phone || body.phone || (curUser ? curUser.phone : '+91 98480 12345'),
         customer_email: body.customer_email || body.email || (curUser ? curUser.email : 'customer@example.com'),
@@ -177,52 +256,20 @@ const ApiClient = {
     }
     if (endpoint === '/api/bookings' || endpoint.startsWith('/api/bookings?')) {
       const existing = JSON.parse(localStorage.getItem('siri_bookings') || '[]');
-      return { bookings: existing };
+      const curUser = this.getCurrentUser();
+      const urlParams = new URLSearchParams(endpoint.includes('?') ? endpoint.split('?')[1] : '');
+      const queryUserId = urlParams.get('user_id') || (curUser && curUser.role !== 'admin' ? curUser.id : null);
+      if (queryUserId) {
+        return { bookings: existing.filter(b => b.user_id && String(b.user_id) === String(queryUserId)) };
+      }
+      return { bookings: curUser && curUser.role === 'admin' ? existing : [] };
     }
     if (endpoint.startsWith('/api/bookings/')) {
       const bId = endpoint.split('/')[3];
       const existing = JSON.parse(localStorage.getItem('siri_bookings') || '[]');
       let found = existing.find(x => x.id && x.id.toUpperCase() === (bId || '').toUpperCase());
       if (!found) {
-        found = {
-          id: bId || 'SIRI-928412',
-          customer_name: 'Sunil Kumar',
-          customer_phone: '+91 98480 12345',
-          customer_email: 'sunil@example.com',
-          service_date: '2026-09-25',
-          service_slot: '10:30 AM',
-          status: 'assigned',
-          technician_name: 'Raj Kumar',
-          technician_phone: '+91 98480 11223',
-          technician_rating: 4.9,
-          total_amount: 1499,
-          created_at: new Date().toISOString(),
-          address: { house_flat: 'Flat 402, Royal Palms', street: 'Road No 12', area: 'Banjara Hills', city: 'Hyderabad', pincode: '500034', lat: 17.4156, lng: 78.4357 },
-          address_json: JSON.stringify({ house_flat: 'Flat 402, Royal Palms', street: 'Road No 12', area: 'Banjara Hills', city: 'Hyderabad', pincode: '500034', lat: 17.4156, lng: 78.4357 }),
-          items: [
-            { id: 1, variant_name: '3-Seater Fabric Sofa Deep Clean', service_name: 'Sofa Cleaning', quantity: 1, total_price: 1099 },
-            { id: 2, variant_name: 'Single Mattress Steam Sanitization', service_name: 'Mattress Cleaning', quantity: 1, total_price: 400 }
-          ]
-        };
-      } else {
-        // Ensure address is always parsed object
-        if (!found.address || typeof found.address !== 'object') {
-          try {
-            found.address = found.address_json ? JSON.parse(found.address_json) : {};
-          } catch(e) {
-            found.address = {};
-          }
-        }
-        if (!found.items || !found.items.length) {
-          found.items = [
-            { id: 1, variant_name: 'Sofa Deep Cleaning & Sanitization', service_name: 'Sofa Cleaning', quantity: 1, total_price: found.total_amount || 1499 }
-          ];
-        }
-        if (!found.technician_name) {
-          found.technician_name = 'Raj Kumar';
-          found.technician_phone = '+91 98480 11223';
-          found.technician_rating = 4.9;
-        }
+        throw new Error(`Booking reference ${bId} not found`);
       }
       return { booking: found };
     }

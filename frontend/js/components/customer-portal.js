@@ -385,10 +385,14 @@ const CustomerPortalComponent = {
     }
     try {
       const res = await ApiClient.getBookings(user.id);
-      this.customerBookings = res.bookings || [];
+      const all = res.bookings || [];
+      // Strict user-isolation: ensure customers only see their own bookings
+      this.customerBookings = all.filter(b => b.user_id ? String(b.user_id) === String(user.id) : (user.role === 'admin'));
       this.refresh();
     } catch (e) {
       console.error("Failed to load customer bookings", e);
+      this.customerBookings = [];
+      this.refresh();
     }
   },
 

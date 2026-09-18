@@ -407,7 +407,7 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 if phone:
                     clean_phone = phone.replace('+91', '').replace(' ', '').replace('-', '').strip()
                     if len(clean_phone) >= 10:
-                        cursor.execute("SELECT id FROM users WHERE phone LIKE ?", (f"%{clean_phone[-10:]}",))
+                        cursor.execute("SELECT id FROM users WHERE REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+91', '') LIKE ?", (f"%{clean_phone[-10:]}",))
                         if cursor.fetchone():
                             return self.send_json(400, {'error': 'User already exists with this mobile number. Please sign in instead.', 'field': 'phone'})
 
@@ -462,6 +462,10 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     'user': u_dict,
                     'token': f"token_{new_id}_{int(datetime.now().timestamp())}",
                     'requires_verification': True,
+                    'mobile_delivered': m_res['delivered'] if phone else False,
+                    'email_delivered': e_res['delivered'],
+                    'dev_mobile_code': m_code if phone and not m_res['delivered'] else None,
+                    'dev_email_code': e_code if not e_res['delivered'] else None,
                     'message': 'Account created! Verification codes sent to both your mobile and email.'
                 })
 
@@ -521,6 +525,7 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     'type': otp_type,
                     'delivered': dispatch_res['delivered'],
                     'provider': dispatch_res['provider'],
+                    'dev_code': otp_code if not dispatch_res['delivered'] else None,
                     'expires_in_minutes': 10
                 })
 
