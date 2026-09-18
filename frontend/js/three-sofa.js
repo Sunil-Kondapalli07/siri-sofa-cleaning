@@ -17,7 +17,7 @@ class Sofa3DViewer {
     this.foamParticles = [];
     this.sprayParticles = null;
     
-    this.currentColor = 0x0d9488; // Default Deep Ocean Teal
+    this.currentColor = 0x0C4A34; // Default Forest Emerald
     this.currentConfig = '3-seater'; // '1-seater', '2-seater', '3-seater', 'l-shape'
     this.isDirty = false;
     this.isSprayActive = false;
@@ -27,8 +27,8 @@ class Sofa3DViewer {
   }
 
   init() {
-    const width = this.container.clientWidth;
-    const height = this.container.clientHeight;
+    const width = this.container.clientWidth || 600;
+    const height = this.container.clientHeight || 460;
 
     // 1. Scene
     this.scene = new THREE.Scene();
@@ -39,10 +39,11 @@ class Sofa3DViewer {
     this.camera.position.set(3.8, 2.2, 4.2);
 
     // 3. Renderer
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.container.appendChild(this.renderer.domElement);
 
@@ -428,14 +429,14 @@ class Sofa3DViewer {
       el.className = 'absolute -translate-x-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer group';
       el.innerHTML = `
         <div class="relative flex items-center justify-center">
-          <span class="animate-ping absolute inline-flex h-6 w-6 rounded-full bg-teal-400 opacity-60"></span>
-          <div class="w-7 h-7 rounded-full bg-teal-600 hover:bg-teal-500 text-white font-black text-xs flex items-center justify-center shadow-lg border-2 border-white group-hover:scale-125 transition-transform">
+          <span class="animate-ping absolute inline-flex h-6 w-6 rounded-full bg-emerald-400 opacity-60"></span>
+          <div class="w-7 h-7 rounded-full bg-[#0C4A34] hover:bg-[#083324] text-white font-black text-xs flex items-center justify-center shadow-lg border-2 border-white group-hover:scale-125 transition-transform">
             +
           </div>
-          <div class="absolute bottom-9 left-1/2 -translate-x-1/2 w-48 bg-slate-900/95 backdrop-blur-md text-white p-2.5 rounded-xl text-left border border-slate-700 shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-30">
-            <div class="text-[10px] font-bold uppercase text-teal-400 font-mono">${hs.step}</div>
-            <div class="text-xs font-bold text-white mt-0.5">${hs.title}</div>
-            <div class="text-[10px] text-slate-300 mt-1 leading-snug">${hs.desc}</div>
+          <div class="absolute bottom-9 left-1/2 -translate-x-1/2 w-52 bg-slate-950/95 backdrop-blur-md text-white p-3 rounded-2xl text-left border border-emerald-500/30 shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-30">
+            <div class="text-[10px] font-bold uppercase text-emerald-400 font-mono tracking-wider">${hs.step}</div>
+            <div class="text-xs font-black text-white mt-0.5">${hs.title}</div>
+            <div class="text-[11px] text-stone-300 mt-1 leading-snug">${hs.desc}</div>
           </div>
         </div>
       `;

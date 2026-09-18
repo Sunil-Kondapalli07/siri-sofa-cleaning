@@ -78,26 +78,72 @@ const HeroComponent = {
 
             </div>
 
-            <!-- Right Column: Premium Hero Visual Showcase -->
+            <!-- Right Column: Interactive 3D Sofa Studio & Photography -->
             <div class="lg:col-span-6 relative">
-              <div class="relative rounded-3xl overflow-hidden shadow-2xl border border-black/8 bg-white group">
-                <img src="images/hero_luxury_sofa.jpg" alt="Restored Luxury Green Velvet Sofa" class="w-full h-[420px] sm:h-[480px] lg:h-[520px] object-cover object-center group-hover:scale-102 transition-transform duration-700 ease-out">
+              <div class="relative rounded-3xl overflow-hidden shadow-2xl border border-black/8 bg-[#FAF9F6] group">
                 
-                <!-- Floating Glass Card Overlay -->
-                <div class="absolute bottom-5 left-5 right-5 sm:right-auto sm:max-w-xs glass-card rounded-2xl p-4 shadow-xl text-left border border-white/40">
-                  <div class="flex items-center gap-2.5 mb-1">
-                    <div class="w-2.5 h-2.5 rounded-full bg-[#0C4A34] animate-pulse"></div>
-                    <span class="text-[10px] font-black uppercase tracking-widest text-[#0C4A34]">Doorstep Deep Steam</span>
-                  </div>
-                  <div class="font-display font-extrabold text-sm text-[#121820]">Deep Fiber Extraction</div>
-                  <p class="text-[11px] text-[#525D6C] mt-0.5 leading-snug">Hot-water injection vacuum extracting grime, stains, and micro-particles without residue.</p>
+                <!-- View Mode Switcher Pills -->
+                <div class="absolute top-4 left-4 z-30 flex items-center p-1 rounded-2xl bg-white/95 backdrop-blur-md border border-black/8 shadow-md text-xs font-bold">
+                  <button id="hero-tab-3d-btn" onclick="HeroComponent.switchHeroVisual('3d')" class="px-3 py-1.5 rounded-xl bg-[#0C4A34] text-white shadow-xs transition-all flex items-center gap-1.5">
+                    <span>🎮 3D Studio</span>
+                  </button>
+                  <button id="hero-tab-photo-btn" onclick="HeroComponent.switchHeroVisual('photo')" class="px-3 py-1.5 rounded-xl text-stone-600 hover:text-stone-900 transition-all flex items-center gap-1.5">
+                    <span>📸 Restored Suite</span>
+                  </button>
                 </div>
 
-                <!-- Quality Badge Top-Right -->
-                <div class="absolute top-4 right-4 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full shadow-md border border-black/5 flex items-center gap-1.5 text-xs font-bold text-[#121820]">
-                  <span class="text-[#0C4A34]">✓</span>
-                  <span>Eco-Safe Safe Chemistry</span>
+                <!-- Live 3D Hint Badge -->
+                <div class="absolute top-4 right-4 z-30 bg-[#0C4A34]/90 text-white backdrop-blur-md px-3 py-1.5 rounded-full shadow-md text-[11px] font-mono font-bold flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                  <span>Drag to Rotate 360°</span>
                 </div>
+
+                <!-- 1. 3D WebGL Canvas Container -->
+                <div id="hero-3d-container" class="w-full h-[460px] sm:h-[500px] relative bg-gradient-to-b from-stone-100/70 to-stone-200/50">
+                  <div id="hero-3d-sofa-canvas" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
+
+                  <!-- 3D Studio Control Toolbar -->
+                  <div class="absolute bottom-4 left-4 right-4 z-30 glass-card rounded-2xl p-3 shadow-xl border border-white/60 flex flex-wrap items-center justify-between gap-2.5">
+                    
+                    <!-- Color Swatches -->
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-[10px] font-bold text-stone-500 uppercase font-mono mr-1 hidden sm:inline">Fabric:</span>
+                      <button onclick="HeroComponent.changeColor(0x0C4A34)" class="w-6 h-6 rounded-full bg-[#0C4A34] border-2 border-white shadow-sm ring-1 ring-black/10 hover:scale-125 transition-transform" title="Forest Emerald Velvet"></button>
+                      <button onclick="HeroComponent.changeColor(0x1E3A8A)" class="w-6 h-6 rounded-full bg-[#1E3A8A] border-2 border-white shadow-sm ring-1 ring-black/10 hover:scale-125 transition-transform" title="Royal Sapphire"></button>
+                      <button onclick="HeroComponent.changeColor(0x9A3412)" class="w-6 h-6 rounded-full bg-[#9A3412] border-2 border-white shadow-sm ring-1 ring-black/10 hover:scale-125 transition-transform" title="Terracotta Rust"></button>
+                      <button onclick="HeroComponent.changeColor(0x27272A)" class="w-6 h-6 rounded-full bg-[#27272A] border-2 border-white shadow-sm ring-1 ring-black/10 hover:scale-125 transition-transform" title="Charcoal Velvet"></button>
+                      <button onclick="HeroComponent.changeColor(0xE7E5E4)" class="w-6 h-6 rounded-full bg-[#E7E5E4] border-2 border-white shadow-sm ring-1 ring-black/10 hover:scale-125 transition-transform" title="Warm Ivory"></button>
+                    </div>
+
+                    <!-- Config Morpher -->
+                    <div class="flex items-center gap-1 bg-stone-100/90 p-0.5 rounded-xl border border-stone-200/80 text-[11px] font-bold">
+                      <button onclick="HeroComponent.changeConfig('3-seater')" class="sofa-config-btn px-2 py-1 rounded-lg bg-white text-[#0C4A34] shadow-xs" data-config="3-seater">3-Seat</button>
+                      <button onclick="HeroComponent.changeConfig('l-shape')" class="sofa-config-btn px-2 py-1 rounded-lg text-stone-600 hover:text-stone-900" data-config="l-shape">L-Shape</button>
+                      <button onclick="HeroComponent.changeConfig('2-seater')" class="sofa-config-btn px-2 py-1 rounded-lg text-stone-600 hover:text-stone-900" data-config="2-seater">2-Seat</button>
+                    </div>
+
+                    <!-- Steam Simulation Action -->
+                    <button id="hero-clean-spray-btn" onclick="HeroComponent.triggerDeepCleanEffect()" class="px-3.5 py-1.5 rounded-xl bg-[#0C4A34] hover:bg-[#083324] text-white text-xs font-bold shadow-md shadow-[#0C4A34]/20 flex items-center gap-1.5 transition-all transform hover:scale-103 active:scale-97">
+                      <span>✨ Simulate Clean</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 2. Alternative Photo View (Hidden by default, toggleable) -->
+                <div id="hero-photo-container" class="hidden w-full h-[460px] sm:h-[500px] relative">
+                  <img src="images/hero_luxury_sofa.jpg" alt="Restored Luxury Green Velvet Sofa" class="w-full h-full object-cover object-center">
+                  
+                  <!-- Floating Glass Card Overlay -->
+                  <div class="absolute bottom-5 left-5 right-5 sm:right-auto sm:max-w-xs glass-card rounded-2xl p-4 shadow-xl text-left border border-white/40">
+                    <div class="flex items-center gap-2.5 mb-1">
+                      <div class="w-2.5 h-2.5 rounded-full bg-[#0C4A34] animate-pulse"></div>
+                      <span class="text-[10px] font-black uppercase tracking-widest text-[#0C4A34]">Doorstep Deep Steam</span>
+                    </div>
+                    <div class="font-display font-extrabold text-sm text-[#121820]">Deep Fiber Extraction</div>
+                    <p class="text-[11px] text-[#525D6C] mt-0.5 leading-snug">Hot-water injection vacuum extracting grime, stains, and micro-particles without residue.</p>
+                  </div>
+                </div>
+
               </div>
             </div>
 
@@ -212,7 +258,7 @@ const HeroComponent = {
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             
             <!-- Feature 1 -->
-            <div class="bg-white p-7 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 hover:-translate-y-1 transition-all">
+            <div class="card-3d-tilt bg-white p-7 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 transition-all">
               <div class="w-12 h-12 rounded-xl bg-[#EBF5F0] text-[#0C4A34] flex items-center justify-center text-2xl mb-4 font-bold">
                 👨‍🔧
               </div>
@@ -223,7 +269,7 @@ const HeroComponent = {
             </div>
 
             <!-- Feature 2 -->
-            <div class="bg-white p-7 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 hover:-translate-y-1 transition-all">
+            <div class="card-3d-tilt bg-white p-7 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 transition-all">
               <div class="w-12 h-12 rounded-xl bg-[#EBF5F0] text-[#0C4A34] flex items-center justify-center text-2xl mb-4 font-bold">
                 🌿
               </div>
@@ -234,7 +280,7 @@ const HeroComponent = {
             </div>
 
             <!-- Feature 3 -->
-            <div class="bg-white p-7 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 hover:-translate-y-1 transition-all">
+            <div class="card-3d-tilt bg-white p-7 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 transition-all">
               <div class="w-12 h-12 rounded-xl bg-[#EBF5F0] text-[#0C4A34] flex items-center justify-center text-2xl mb-4 font-bold">
                 🛵
               </div>
@@ -245,7 +291,7 @@ const HeroComponent = {
             </div>
 
             <!-- Feature 4 -->
-            <div class="bg-white p-7 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 hover:-translate-y-1 transition-all">
+            <div class="card-3d-tilt bg-white p-7 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 transition-all">
               <div class="w-12 h-12 rounded-xl bg-[#EBF5F0] text-[#0C4A34] flex items-center justify-center text-2xl mb-4 font-bold">
                 🏷️
               </div>
@@ -256,7 +302,7 @@ const HeroComponent = {
             </div>
 
             <!-- Feature 5 -->
-            <div class="bg-white p-7 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 hover:-translate-y-1 transition-all">
+            <div class="card-3d-tilt bg-white p-7 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 transition-all">
               <div class="w-12 h-12 rounded-xl bg-[#EBF5F0] text-[#0C4A34] flex items-center justify-center text-2xl mb-4 font-bold">
                 📱
               </div>
@@ -267,7 +313,7 @@ const HeroComponent = {
             </div>
 
             <!-- Feature 6 -->
-            <div class="bg-white p-7 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 hover:-translate-y-1 transition-all">
+            <div class="card-3d-tilt bg-white p-7 rounded-2xl border border-black/5 shadow-xs hover:border-[#0C4A34]/25 transition-all">
               <div class="w-12 h-12 rounded-xl bg-[#EBF5F0] text-[#0C4A34] flex items-center justify-center text-2xl mb-4 font-bold">
                 ✨
               </div>
@@ -284,8 +330,85 @@ const HeroComponent = {
     `;
   },
 
-  initThreeViewer() {
-    // Optional ambient particles or 3D canvas initializer
+  initViewer() {
+    const canvasContainer = document.getElementById('hero-3d-sofa-canvas');
+    if (!canvasContainer) return;
+
+    try {
+      if (typeof Sofa3DViewer !== 'undefined') {
+        if (!this.viewerInstance) {
+          this.viewerInstance = new Sofa3DViewer('hero-3d-sofa-canvas');
+        } else if (this.viewerInstance.onResize) {
+          this.viewerInstance.onResize();
+        }
+      }
+    } catch (err) {
+      console.warn("3D Sofa Viewer notice:", err);
+    }
+  },
+
+  changeColor(hexColor) {
+    if (this.viewerInstance && this.viewerInstance.setColor) {
+      this.viewerInstance.setColor(hexColor);
+    }
+  },
+
+  changeConfig(configType) {
+    if (this.viewerInstance && this.viewerInstance.setConfig) {
+      this.viewerInstance.setConfig(configType);
+    }
+    document.querySelectorAll('.sofa-config-btn').forEach(btn => {
+      if (btn.getAttribute('data-config') === configType) {
+        btn.className = 'sofa-config-btn px-2 py-1 rounded-lg bg-white text-[#0C4A34] shadow-xs';
+      } else {
+        btn.className = 'sofa-config-btn px-2 py-1 rounded-lg text-stone-600 hover:text-stone-900';
+      }
+    });
+  },
+
+  triggerDeepCleanEffect() {
+    const btn = document.getElementById('hero-clean-spray-btn');
+    if (btn) {
+      btn.innerHTML = `<span class="animate-spin text-xs">⚡</span> <span>Extracting...</span>`;
+      btn.disabled = true;
+    }
+    if (this.viewerInstance && this.viewerInstance.triggerCleaningDemo) {
+      this.viewerInstance.triggerCleaningDemo(() => {
+        if (btn) {
+          btn.innerHTML = `<span>✨ Restored Clean!</span>`;
+          btn.classList.remove('bg-[#0C4A34]');
+          btn.classList.add('bg-emerald-600');
+          setTimeout(() => {
+            btn.innerHTML = `<span>✨ Simulate Clean</span>`;
+            btn.classList.remove('bg-emerald-600');
+            btn.classList.add('bg-[#0C4A34]');
+            btn.disabled = false;
+          }, 2000);
+        }
+      });
+    }
+  },
+
+  switchHeroVisual(mode) {
+    const container3d = document.getElementById('hero-3d-container');
+    const containerPhoto = document.getElementById('hero-photo-container');
+    const btn3d = document.getElementById('hero-tab-3d-btn');
+    const btnPhoto = document.getElementById('hero-tab-photo-btn');
+
+    if (mode === 'photo') {
+      if (container3d) container3d.classList.add('hidden');
+      if (containerPhoto) containerPhoto.classList.remove('hidden');
+      if (btn3d) btn3d.className = 'px-3 py-1.5 rounded-xl text-stone-600 hover:text-stone-900 transition-all flex items-center gap-1.5';
+      if (btnPhoto) btnPhoto.className = 'px-3 py-1.5 rounded-xl bg-[#0C4A34] text-white shadow-xs transition-all flex items-center gap-1.5';
+    } else {
+      if (containerPhoto) containerPhoto.classList.add('hidden');
+      if (container3d) container3d.classList.remove('hidden');
+      if (btnPhoto) btnPhoto.className = 'px-3 py-1.5 rounded-xl text-stone-600 hover:text-stone-900 transition-all flex items-center gap-1.5';
+      if (btn3d) btn3d.className = 'px-3 py-1.5 rounded-xl bg-[#0C4A34] text-white shadow-xs transition-all flex items-center gap-1.5';
+      if (this.viewerInstance && this.viewerInstance.onResize) {
+        setTimeout(() => this.viewerInstance.onResize(), 60);
+      }
+    }
   }
 };
 

@@ -161,25 +161,28 @@ const App = {
         <div id="services-view-container">${ServiceSelectorComponent.render()}</div>
         <div id="reviews-view-container">${ReviewsFaqComponent.render()}</div>
       `;
-      // Initialize 3D Hero and Before/After Slider
+      // Initialize 3D Hero, Before/After Slider, and Modern 3D Motion
       setTimeout(() => {
-        HeroComponent.initViewer();
-        HygieneProcessComponent.initSlider();
-      }, 50);
+        try { HeroComponent.initViewer(); } catch (e) { console.warn("Hero 3D notice:", e); }
+        try { HygieneProcessComponent.initSlider(); } catch (e) { console.warn("Slider notice:", e); }
+        this.init3DMotionEffects();
+      }, 70);
 
     } else if (viewName === 'services') {
       main.innerHTML = `
         <div id="services-view-container">${ServiceSelectorComponent.render()}</div>
         <div id="reviews-view-container">${ReviewsFaqComponent.render()}</div>
       `;
+      setTimeout(() => this.init3DMotionEffects(), 70);
 
     } else if (viewName === 'hygiene') {
       main.innerHTML = `
         <div id="hygiene-view-container">${HygieneProcessComponent.render()}</div>
       `;
       setTimeout(() => {
-        HygieneProcessComponent.initSlider();
-      }, 50);
+        try { HygieneProcessComponent.initSlider(); } catch (e) { console.warn(e); }
+        this.init3DMotionEffects();
+      }, 70);
 
     } else if (viewName === 'book') {
       main.innerHTML = `
@@ -388,6 +391,24 @@ const App = {
         btn.innerText = 'Authenticate & Open Operations HQ';
       }
     }
+  },
+
+  init3DMotionEffects() {
+    // 1. Perspective 3D Tilt on cards
+    const tiltCards = document.querySelectorAll('.card-3d-tilt');
+    tiltCards.forEach(card => {
+      card.onmousemove = (e) => {
+        const rect = card.getBoundingClientRect();
+        const x = e.clientX - rect.left - rect.width / 2;
+        const y = e.clientY - rect.top - rect.height / 2;
+        const rx = (y / (rect.height / 2)) * -5;
+        const ry = (x / (rect.width / 2)) * 5;
+        card.style.transform = `perspective(1000px) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) translateY(-4px)`;
+      };
+      card.onmouseleave = () => {
+        card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) translateY(0px)';
+      };
+    });
   },
 
   authTab: 'login', // 'login' or 'signup'
