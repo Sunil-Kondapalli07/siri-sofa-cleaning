@@ -1,0 +1,1222 @@
+/**
+ * Siri Sofa Services — Main Application Controller
+ */
+
+const App = {
+  async init() {
+    console.log("Initializing Siri Sofa Services App...");
+
+    // 1. Load Initial Data (Services & Dynamic Pricing from Backend)
+    await store.loadInitialData();
+
+    // 2. Setup Subscriber
+    store.subscribe((event, data) => {
+      if (event === 'view_change') {
+        this.renderView(data);
+      } else if (event === 'user_change') {
+        this.updateNav();
+        if (store.currentView === 'customer') {
+          CustomerPortalComponent.loadCustomerData();
+        } else if (store.currentView === 'book') {
+          BookingWizardComponent.refresh();
+        }
+      }
+    });
+
+    // 3. Initial Navigation based on Hash or Default
+    const hash = window.location.hash.replace('#', '');
+    const initialView = ['home', 'services', 'hygiene', 'book', 'track', 'customer', 'admin'].includes(hash) ? hash : 'home';
+    store.currentView = initialView;
+
+    // 4. Initial Render
+    this.render();
+
+    // 5. Setup Hash listener
+    window.addEventListener('hashchange', () => {
+      const h = window.location.hash.replace('#', '');
+      if (['home', 'services', 'hygiene', 'book', 'track', 'customer', 'admin'].includes(h)) {
+        if (store.currentView !== h) {
+          store.setView(h);
+        }
+      }
+    });
+  },
+
+  render() {
+    const root = document.getElementById('app');
+    if (!root) return;
+
+    root.innerHTML = `
+      <div class="min-h-screen flex flex-col bg-slate-50 text-slate-900 selection:bg-teal-500 selection:text-white">
+        <!-- Navigation Bar -->
+        <div id="nav-host">
+          ${NavbarComponent.render()}
+        </div>
+
+        <!-- Dynamic Main Content View -->
+        <main id="main-content" class="flex-1">
+          <!-- Views will be dynamically injected here -->
+        </main>
+
+        <!-- Global Footer -->
+        <footer class="bg-slate-950 text-slate-400 py-12 border-t border-slate-800">
+          <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+              <div class="space-y-3">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-xl bg-teal-600 text-white flex items-center justify-center font-bold text-sm">
+                    🛋️
+                  </div>
+                  <span class="font-display font-black text-xl text-white">Siri Sofa Services</span>
+                </div>
+                <p class="text-xs leading-relaxed text-slate-400">
+                  Leading 3D-first residential & commercial upholstery deep cleaning platform. Hyderabad • Bengaluru • Mumbai • Pune.
+                </p>
+              </div>
+
+              <div>
+                <h4 class="font-bold text-white text-xs uppercase tracking-wider mb-3">Our Core Services</h4>
+                <ul class="text-xs space-y-2">
+                  <li><a href="#services" onclick="store.setView('services')" class="hover:text-teal-400 transition-colors">Fabric & Velvet Sofa Cleaning</a></li>
+                  <li><a href="#services" onclick="store.setView('services')" class="hover:text-teal-400 transition-colors">Dining & Office Chair Shampoo</a></li>
+                  <li><a href="#services" onclick="store.setView('services')" class="hover:text-teal-400 transition-colors">Anti-Allergen Mattress Sanitization</a></li>
+                  <li><a href="#services" onclick="store.setView('services')" class="hover:text-teal-400 transition-colors">Living Room Carpet Deep Extraction</a></li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 class="font-bold text-white text-xs uppercase tracking-wider mb-3">Customer Portals</h4>
+                <ul class="text-xs space-y-2">
+                  <li><a href="#track" onclick="store.setView('track')" class="hover:text-teal-400 transition-colors">Track Live Cleaning Dispatch</a></li>
+                  <li><a href="#customer" onclick="store.setView('customer')" class="hover:text-teal-400 transition-colors">Customer Account & Past Invoices</a></li>
+                  <li><a href="#hygiene" onclick="store.setView('hygiene')" class="hover:text-teal-400 transition-colors">6-Step Hospital Grade Process</a></li>
+                  <li><a href="#services" onclick="store.setView('services')" class="hover:text-teal-400 transition-colors">Hyderabad Service Coverage</a></li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 class="font-bold text-white text-xs uppercase tracking-wider mb-3">Direct Support</h4>
+                <div class="text-xs space-y-2">
+                  <div class="flex items-center gap-2">
+                    <span class="text-teal-400">📞</span>
+                    <span>+91 98000 00000</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-teal-400">✉️</span>
+                    <span>support@sirisofa.com</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-teal-400">⏰</span>
+                    <span>08:00 AM – 08:00 PM (Daily)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-8 border-t border-slate-800 text-center text-xs text-slate-600 flex flex-col sm:flex-row items-center justify-between gap-2">
+              <div>© 2026 Siri Sofa Services Pvt Ltd. All rights reserved. Hyderabad, Telangana.</div>
+              <div class="flex items-center gap-4">
+                <a href="javascript:void(0)" class="hover:text-slate-400">Privacy Policy</a>
+                <a href="javascript:void(0)" class="hover:text-slate-400">Terms of Service</a>
+                <a href="javascript:void(0)" class="hover:text-slate-400">Doorstep Hygiene Guarantee</a>
+                <span class="text-slate-800">•</span>
+                <a href="#admin" onclick="store.setView('admin')" class="hover:text-slate-400 text-slate-600 font-mono text-[11px] flex items-center gap-1">
+                  <span>🔒 Staff Operations</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </footer>
+
+        <!-- Global Auth Modal -->
+        ${this.renderAuthModal()}
+
+        <!-- Global OTP Verification Modal (Single) -->
+        ${this.renderOtpModal()}
+
+        <!-- Global Dual OTP Verification Modal (Signup) -->
+        ${this.renderSignupVerifyModal()}
+      </div>
+    `;
+
+    this.renderView(store.currentView);
+  },
+
+  updateNav() {
+    const host = document.getElementById('nav-host');
+    if (host) host.innerHTML = NavbarComponent.render();
+  },
+
+  renderView(viewName) {
+    window.location.hash = viewName;
+    this.updateNav();
+
+    const main = document.getElementById('main-content');
+    if (!main) return;
+
+    if (viewName === 'home') {
+      main.innerHTML = `
+        <div id="hero-view-container">${HeroComponent.render()}</div>
+        <div id="hygiene-view-container">${HygieneProcessComponent.render()}</div>
+        <div id="services-view-container">${ServiceSelectorComponent.render()}</div>
+        <div id="reviews-view-container">${ReviewsFaqComponent.render()}</div>
+      `;
+      // Initialize 3D Hero and Before/After Slider
+      setTimeout(() => {
+        HeroComponent.initViewer();
+        HygieneProcessComponent.initSlider();
+      }, 50);
+
+    } else if (viewName === 'services') {
+      main.innerHTML = `
+        <div id="services-view-container">${ServiceSelectorComponent.render()}</div>
+        <div id="reviews-view-container">${ReviewsFaqComponent.render()}</div>
+      `;
+
+    } else if (viewName === 'hygiene') {
+      main.innerHTML = `
+        <div id="hygiene-view-container">${HygieneProcessComponent.render()}</div>
+      `;
+      setTimeout(() => {
+        HygieneProcessComponent.initSlider();
+      }, 50);
+
+    } else if (viewName === 'book') {
+      main.innerHTML = `
+        <div id="booking-view-container">${BookingWizardComponent.render()}</div>
+      `;
+      if (store.wizard.step === 3) {
+        setTimeout(() => BookingWizardComponent.initMap(), 80);
+      }
+
+    } else if (viewName === 'track') {
+      main.innerHTML = `
+        <div id="tracker-view-container">${BookingTrackerComponent.render()}</div>
+      `;
+      setTimeout(() => {
+        if (store.trackingBookingId) {
+          BookingTrackerComponent.loadBooking(store.trackingBookingId);
+        } else {
+          BookingTrackerComponent.renderInitialSearchPrompt();
+        }
+      }, 50);
+
+    } else if (viewName === 'customer') {
+      if (!store.currentUser) {
+        main.innerHTML = this.renderCustomerLoginPrompt();
+        return;
+      }
+      main.innerHTML = `
+        <div id="customer-view-container">${CustomerPortalComponent.render()}</div>
+      `;
+      setTimeout(() => {
+        CustomerPortalComponent.loadCustomerData();
+      }, 50);
+
+    } else if (viewName === 'admin') {
+      // Security Route Guard: Prevent unauthorized customer/visitor access
+      if (!store.currentUser) {
+        main.innerHTML = this.renderAdminLoginGateway();
+        return;
+      }
+      if (store.currentUser.role !== 'admin') {
+        main.innerHTML = this.renderAccessDeniedView();
+        return;
+      }
+      main.innerHTML = `
+        <div id="admin-view-container">${AdminPortalComponent.render()}</div>
+      `;
+      setTimeout(() => {
+        AdminPortalComponent.loadAdminData();
+      }, 50);
+    }
+  },
+
+  renderCustomerLoginPrompt() {
+    return `
+      <section class="min-h-[70vh] flex items-center justify-center p-4 bg-slate-50">
+        <div class="max-w-md w-full bg-white rounded-3xl p-8 shadow-xl border border-slate-200/80 text-center">
+          <div class="w-16 h-16 rounded-2xl bg-teal-50 text-teal-700 flex items-center justify-center mx-auto mb-4 text-3xl font-black">
+            👤
+          </div>
+          <h2 class="text-2xl font-black text-slate-900">Customer Account</h2>
+          <p class="text-xs text-slate-500 mt-1 mb-6">
+            Please sign in to view your upcoming bookings, past service invoices, and manage saved Hyderabad addresses.
+          </p>
+          <div class="space-y-3">
+            <button onclick="NavbarComponent.openAuthModal('login')" class="w-full py-3.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-sm shadow-md shadow-teal-600/20 transition-all">
+              Sign In to My Account
+            </button>
+            <button onclick="NavbarComponent.openAuthModal('signup')" class="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors">
+              Create New Customer Account (Sign Up)
+            </button>
+            <button onclick="store.setView('home')" class="w-full py-2.5 rounded-xl text-slate-500 hover:text-slate-800 text-xs font-semibold transition-colors">
+              ← Return to Home Page
+            </button>
+          </div>
+        </div>
+      </section>
+    `;
+  },
+
+  renderAccessDeniedView() {
+    const user = store.currentUser || { name: 'Customer' };
+    return `
+      <section class="min-h-[85vh] flex items-center justify-center p-4 bg-slate-950 text-slate-100">
+        <div class="max-w-md w-full bg-slate-900 border border-red-500/30 rounded-3xl p-8 text-center shadow-2xl relative overflow-hidden">
+          <div class="absolute -right-12 -top-12 w-40 h-40 bg-red-500/10 rounded-full blur-3xl pointer-events-none"></div>
+          
+          <div class="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-center mx-auto mb-5 text-3xl">
+            🛡️
+          </div>
+          
+          <span class="px-3 py-1 rounded-full bg-red-500/20 text-red-300 text-xs font-mono font-bold uppercase tracking-wider">
+            403 • Access Denied
+          </span>
+          
+          <h2 class="text-2xl font-black text-white mt-3 mb-2">Administrative Privileges Required</h2>
+          
+          <p class="text-xs text-slate-400 leading-relaxed mb-6">
+            You are currently signed in as <strong class="text-slate-200">${user.name}</strong> (<span class="text-teal-400">Customer Account</span>). 
+            Access to the Siri Operations HQ, technician fleet dispatch, and live dynamic pricing engine is strictly restricted to authorized staff administrators.
+          </p>
+
+          <div class="space-y-2.5">
+            <button onclick="store.setView('customer')" class="w-full py-3.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition-all shadow-lg shadow-teal-600/20">
+              ← Return to My Customer Dashboard
+            </button>
+            <button onclick="store.setView('home')" class="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-colors border border-slate-700">
+              Go to Home Page
+            </button>
+            <button onclick="NavbarComponent.handleLogout(); store.setView('admin');" class="w-full py-2.5 rounded-xl text-slate-500 hover:text-red-400 text-xs font-semibold transition-colors">
+              Sign Out & Switch to Staff Account
+            </button>
+          </div>
+        </div>
+      </section>
+    `;
+  },
+
+  renderAdminLoginGateway() {
+    return `
+      <section class="min-h-[85vh] flex items-center justify-center p-4 bg-slate-950 text-slate-100">
+        <div class="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative">
+          <div class="text-center mb-6">
+            <div class="w-14 h-14 rounded-2xl bg-teal-500/20 border border-teal-500/30 text-teal-400 flex items-center justify-center mx-auto mb-3 text-2xl font-black">
+              🔒
+            </div>
+            <span class="px-3 py-1 rounded-full bg-teal-500/20 text-teal-300 text-[11px] font-mono font-bold uppercase tracking-wider">
+              Staff & Operations HQ
+            </span>
+            <h2 class="text-2xl font-black text-white mt-2">Authorized Staff Login</h2>
+            <p class="text-xs text-slate-400 mt-1">Please authenticate with your administrative credentials to manage dispatch and dynamic pricing.</p>
+          </div>
+
+          <form id="staff-login-form" onsubmit="App.handleStaffLogin(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Staff Email</label>
+              <input type="email" id="staff-email" required placeholder="admin@sirisofa.com" class="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-teal-500">
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Password</label>
+              <input type="password" id="staff-password" required placeholder="••••••••" class="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-teal-500">
+            </div>
+
+            <div id="staff-login-error" class="hidden p-3 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 text-xs font-medium"></div>
+
+            <button type="submit" id="staff-login-submit-btn" class="w-full py-3.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-black text-sm tracking-wide transition-all shadow-lg shadow-teal-600/25">
+              Authenticate & Open Operations HQ
+            </button>
+          </form>
+
+          <div class="mt-6 pt-6 border-t border-slate-800 text-center">
+            <button onclick="store.setView('home')" class="text-xs text-slate-500 hover:text-teal-400 transition-colors font-medium">
+              ← Return to Siri Sofa Customer Website
+            </button>
+          </div>
+        </div>
+      </section>
+    `;
+  },
+
+  async handleStaffLogin(evt) {
+    evt.preventDefault();
+    const email = document.getElementById('staff-email')?.value.trim();
+    const password = document.getElementById('staff-password')?.value;
+    const errBox = document.getElementById('staff-login-error');
+    const btn = document.getElementById('staff-login-submit-btn');
+
+    if (errBox) errBox.classList.add('hidden');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = 'Verifying staff credentials...';
+    }
+
+    try {
+      const res = await ApiClient.login(email, password);
+      if (res.user.role !== 'admin') {
+        throw new Error('Access Denied: The specified account does not possess administrator privileges.');
+      }
+      store.setUser(res.user);
+      store.setView('admin');
+    } catch (err) {
+      if (errBox) {
+        errBox.innerText = err.message || 'Staff authentication failed';
+        errBox.classList.remove('hidden');
+      }
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = 'Authenticate & Open Operations HQ';
+      }
+    }
+  },
+
+  authTab: 'login', // 'login' or 'signup'
+
+  renderAuthModal() {
+    return `
+      <div id="auth-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm animate-fade-in">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-100 relative max-h-[90vh] overflow-y-auto">
+          
+          <button onclick="document.getElementById('auth-modal').classList.add('hidden')" class="absolute top-5 right-5 text-slate-400 hover:text-slate-800 p-1 text-2xl font-bold leading-none">
+            &times;
+          </button>
+
+          <!-- Brand Icon & Header -->
+          <div class="text-center mb-5">
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-teal-700 to-teal-500 text-white flex items-center justify-center mx-auto mb-2 text-xl font-black shadow-md shadow-teal-700/20">
+              🛋️
+            </div>
+            <h3 class="text-2xl font-black text-slate-900" id="auth-modal-title">Welcome to Siri Sofa</h3>
+            <p class="text-xs text-slate-500 mt-0.5">Premier Doorstep Upholstery Care in Hyderabad</p>
+          </div>
+
+          <!-- Auth Tab Switcher (Sign In vs Create Account) -->
+          <div class="flex items-center p-1 bg-slate-100 rounded-2xl mb-5 border border-slate-200">
+            <button id="auth-tab-login-btn" onclick="App.switchAuthTab('login')" class="flex-1 py-2 rounded-xl text-xs font-bold transition-all bg-white text-teal-800 shadow-sm">
+              Sign In
+            </button>
+            <button id="auth-tab-signup-btn" onclick="App.switchAuthTab('signup')" class="flex-1 py-2 rounded-xl text-xs font-bold transition-all text-slate-500 hover:text-slate-800">
+              Create Account (Sign Up)
+            </button>
+          </div>
+
+          <!-- 1. SIGN IN FORM -->
+          <div id="auth-login-view" class="${this.authTab === 'login' ? 'block' : 'hidden'}">
+            <form onsubmit="App.handleLogin(event)" class="space-y-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Email / Phone *</label>
+                <input type="email" id="auth-email" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="name@example.com">
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Password *</label>
+                <input type="password" id="auth-password" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="••••••••">
+              </div>
+
+              <button type="submit" id="auth-submit-btn" class="w-full py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-black text-sm shadow-md transition-colors">
+                Sign In to Account
+              </button>
+
+              <div class="text-center pt-2">
+                <span class="text-xs text-slate-500">Don't have an account yet?</span>
+                <button type="button" onclick="App.switchAuthTab('signup')" class="text-xs font-bold text-teal-700 hover:underline ml-1">
+                  Create Account
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- 2. SIGN UP (REGISTRATION) FORM -->
+          <div id="auth-signup-view" class="${this.authTab === 'signup' ? 'block' : 'hidden'}">
+            <form onsubmit="App.handleRegister(event)" class="space-y-3.5">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Full Name *</label>
+                <input type="text" id="reg-name" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="e.g. Ramesh Reddy">
+              </div>
+
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Mobile (+91) *</label>
+                  <input type="text" id="reg-phone" required class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="+91 98480 99887">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Hyderabad Area *</label>
+                  <select id="reg-area" class="w-full px-2.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:ring-2 focus:ring-teal-500 focus:outline-none bg-white">
+                    <option value="Banjara Hills">Banjara Hills</option>
+                    <option value="Jubilee Hills">Jubilee Hills</option>
+                    <option value="Gachibowli">Gachibowli</option>
+                    <option value="Madhapur (Hitec City)">Madhapur</option>
+                    <option value="Kondapur">Kondapur</option>
+                    <option value="Kukatpally">Kukatpally</option>
+                    <option value="Secunderabad">Secunderabad</option>
+                    <option value="Manikonda">Manikonda</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Email Address *</label>
+                <input type="email" id="reg-email" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="ramesh@example.com">
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Create Password *</label>
+                <input type="password" id="reg-password" required minlength="4" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="At least 4 characters">
+              </div>
+
+              <div class="text-[11px] text-slate-500">
+                By creating an account, you agree to our 100% Doorstep Hygiene Guarantee in Hyderabad.
+              </div>
+
+              <button type="submit" id="reg-submit-btn" class="w-full py-3 rounded-xl bg-slate-900 hover:bg-teal-700 text-white font-black text-sm shadow-md transition-colors">
+                Create My Account & Continue
+              </button>
+
+              <div class="text-center pt-1">
+                <span class="text-xs text-slate-500">Already registered?</span>
+                <button type="button" onclick="App.switchAuthTab('login')" class="text-xs font-bold text-teal-700 hover:underline ml-1">
+                  Sign In
+                </button>
+              </div>
+            </form>
+          </div>
+
+        </div>
+      </div>
+    `;
+  },
+
+  switchAuthTab(tab) {
+    this.authTab = tab;
+    const loginView = document.getElementById('auth-login-view');
+    const signupView = document.getElementById('auth-signup-view');
+    const loginBtn = document.getElementById('auth-tab-login-btn');
+    const signupBtn = document.getElementById('auth-tab-signup-btn');
+    const title = document.getElementById('auth-modal-title');
+
+    if (tab === 'signup') {
+      if (loginView) loginView.classList.add('hidden');
+      if (signupView) signupView.classList.remove('hidden');
+      if (loginBtn) loginBtn.className = 'flex-1 py-2 rounded-xl text-xs font-bold transition-all text-slate-500 hover:text-slate-800';
+      if (signupBtn) signupBtn.className = 'flex-1 py-2 rounded-xl text-xs font-bold transition-all bg-white text-teal-800 shadow-sm';
+      if (title) title.innerText = 'Create Siri Sofa Account';
+    } else {
+      if (signupView) signupView.classList.add('hidden');
+      if (loginView) loginView.classList.remove('hidden');
+      if (signupBtn) signupBtn.className = 'flex-1 py-2 rounded-xl text-xs font-bold transition-all text-slate-500 hover:text-slate-800';
+      if (loginBtn) loginBtn.className = 'flex-1 py-2 rounded-xl text-xs font-bold transition-all bg-white text-teal-800 shadow-sm';
+      if (title) title.innerText = 'Welcome to Siri Sofa';
+    }
+  },
+
+  renderOtpModal() {
+    return `
+      <div id="otp-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-100 relative text-center">
+          
+          <button onclick="App.closeOtpModal()" class="absolute top-5 right-5 text-slate-400 hover:text-slate-800 p-1 text-2xl font-bold leading-none">
+            &times;
+          </button>
+
+          <div class="w-14 h-14 rounded-2xl bg-teal-50 text-teal-700 flex items-center justify-center mx-auto mb-3 text-2xl font-black shadow-inner border border-teal-100">
+            📱
+          </div>
+
+          <span class="px-3 py-1 rounded-full bg-teal-50 border border-teal-200 text-teal-800 text-xs font-mono font-bold uppercase tracking-wider">
+            Real-Time Verification
+          </span>
+
+          <h3 class="text-2xl font-black text-slate-900 mt-2 mb-1" id="otp-modal-title">Verify Your Account</h3>
+          <p class="text-xs text-slate-500 mb-4 leading-relaxed">
+            Enter the 6-digit verification code sent to <strong id="otp-target-display" class="text-slate-800 font-bold"></strong>
+          </p>
+
+          <!-- Secure Dispatch Notice -->
+          <div class="mb-5 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left flex items-start gap-3">
+            <span class="text-lg">🔒</span>
+            <div class="text-xs text-slate-700 leading-tight">
+              <div class="font-bold text-slate-900">Secure Dispatch Sent</div>
+              <p class="text-[11px] text-slate-500 mt-0.5">A verification code has been dispatched. Please check your SMS or email inbox.</p>
+            </div>
+          </div>
+
+          <!-- 6-Digit Auto-Focus Input Grid -->
+          <div class="flex items-center justify-center gap-2 sm:gap-2.5 my-5">
+            <input type="text" maxlength="1" inputmode="numeric" class="otp-box w-11 h-13 sm:w-12 sm:h-14 text-center text-2xl font-black text-slate-900 rounded-2xl border-2 border-slate-200 focus:border-teal-600 focus:ring-4 focus:ring-teal-100 focus:outline-none transition-all" data-idx="0">
+            <input type="text" maxlength="1" inputmode="numeric" class="otp-box w-11 h-13 sm:w-12 sm:h-14 text-center text-2xl font-black text-slate-900 rounded-2xl border-2 border-slate-200 focus:border-teal-600 focus:ring-4 focus:ring-teal-100 focus:outline-none transition-all" data-idx="1">
+            <input type="text" maxlength="1" inputmode="numeric" class="otp-box w-11 h-13 sm:w-12 sm:h-14 text-center text-2xl font-black text-slate-900 rounded-2xl border-2 border-slate-200 focus:border-teal-600 focus:ring-4 focus:ring-teal-100 focus:outline-none transition-all" data-idx="2">
+            <input type="text" maxlength="1" inputmode="numeric" class="otp-box w-11 h-13 sm:w-12 sm:h-14 text-center text-2xl font-black text-slate-900 rounded-2xl border-2 border-slate-200 focus:border-teal-600 focus:ring-4 focus:ring-teal-100 focus:outline-none transition-all" data-idx="3">
+            <input type="text" maxlength="1" inputmode="numeric" class="otp-box w-11 h-13 sm:w-12 sm:h-14 text-center text-2xl font-black text-slate-900 rounded-2xl border-2 border-slate-200 focus:border-teal-600 focus:ring-4 focus:ring-teal-100 focus:outline-none transition-all" data-idx="4">
+            <input type="text" maxlength="1" inputmode="numeric" class="otp-box w-11 h-13 sm:w-12 sm:h-14 text-center text-2xl font-black text-slate-900 rounded-2xl border-2 border-slate-200 focus:border-teal-600 focus:ring-4 focus:ring-teal-100 focus:outline-none transition-all" data-idx="5">
+          </div>
+
+          <div id="otp-error-msg" class="hidden text-xs font-bold text-red-600 mb-3"></div>
+
+          <button type="button" id="otp-verify-btn" onclick="App.submitOtpVerification()" class="w-full py-3.5 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white font-black text-sm tracking-wide transition-all shadow-lg shadow-teal-600/25">
+            Verify & Confirm
+          </button>
+
+          <!-- Resend Cooldown Countdown -->
+          <div class="mt-4 text-xs text-slate-500">
+            <span>Didn't receive the code?</span>
+            <button type="button" id="otp-resend-btn" onclick="App.resendOtp()" disabled class="font-bold text-teal-700 disabled:text-slate-400 disabled:cursor-not-allowed hover:underline ml-1">
+              Resend in <span id="otp-timer">30</span>s
+            </button>
+          </div>
+
+        </div>
+      </div>
+    `;
+  },
+
+  activeOtpData: null,
+  otpTimerInterval: null,
+
+  async triggerOtpFlow(target, type, userId = null, onComplete = null) {
+    this.activeOtpData = { target, type, userId, onComplete };
+    const modal = document.getElementById('otp-modal');
+    const targetDisp = document.getElementById('otp-target-display');
+    const title = document.getElementById('otp-modal-title');
+    const errBox = document.getElementById('otp-error-msg');
+
+    if (errBox) errBox.classList.add('hidden');
+    if (targetDisp) targetDisp.innerText = target;
+    if (title) title.innerText = type === 'mobile' ? 'Verify Mobile Number' : 'Verify Email Address';
+
+    // Clear inputs
+    const inputs = document.querySelectorAll('.otp-box');
+    inputs.forEach(inp => inp.value = '');
+
+    if (modal) modal.classList.remove('hidden');
+
+    // Request real-time OTP from backend
+    try {
+      await ApiClient.sendOtp(target, type, userId);
+      this.startOtpTimer(30);
+      setTimeout(() => inputs[0]?.focus(), 100);
+      this.setupOtpInputListeners();
+    } catch (e) {
+      if (errBox) {
+        errBox.innerText = e.message;
+        errBox.classList.remove('hidden');
+      }
+    }
+  },
+
+  setupOtpInputListeners() {
+    const inputs = document.querySelectorAll('.otp-box');
+    inputs.forEach((input, index) => {
+      input.oninput = (e) => {
+        const val = e.target.value.replace(/[^0-9]/g, '');
+        e.target.value = val ? val.charAt(val.length - 1) : '';
+        if (e.target.value && index < inputs.length - 1) {
+          inputs[index + 1].focus();
+        }
+      };
+
+      input.onkeydown = (e) => {
+        if (e.key === 'Backspace' && !e.target.value && index > 0) {
+          inputs[index - 1].focus();
+        }
+      };
+
+      input.onpaste = (e) => {
+        e.preventDefault();
+        const pasteData = (e.clipboardData || window.clipboardData).getData('text').replace(/[^0-9]/g, '').slice(0, 6);
+        pasteData.split('').forEach((char, i) => {
+          if (inputs[i]) inputs[i].value = char;
+        });
+        if (pasteData.length === 6) {
+          App.submitOtpVerification();
+        }
+      };
+    });
+  },
+
+  startOtpTimer(seconds = 30) {
+    clearInterval(this.otpTimerInterval);
+    let remaining = seconds;
+    const resendBtn = document.getElementById('otp-resend-btn');
+    const timerDisp = document.getElementById('otp-timer');
+    if (resendBtn) resendBtn.disabled = true;
+
+    this.otpTimerInterval = setInterval(() => {
+      remaining -= 1;
+      if (timerDisp) timerDisp.innerText = remaining;
+      if (remaining <= 0) {
+        clearInterval(this.otpTimerInterval);
+        if (resendBtn) {
+          resendBtn.disabled = false;
+          resendBtn.innerText = 'Resend Code Now';
+        }
+      }
+    }, 1000);
+  },
+
+  async resendOtp() {
+    if (!this.activeOtpData) return;
+    const resendBtn = document.getElementById('otp-resend-btn');
+    if (resendBtn) {
+      resendBtn.disabled = true;
+      resendBtn.innerText = 'Sending...';
+    }
+    await this.triggerOtpFlow(
+      this.activeOtpData.target, 
+      this.activeOtpData.type, 
+      this.activeOtpData.userId, 
+      this.activeOtpData.onComplete
+    );
+  },
+
+  async submitOtpVerification() {
+    if (!this.activeOtpData) return;
+    const inputs = document.querySelectorAll('.otp-box');
+    let code = '';
+    inputs.forEach(inp => code += inp.value);
+
+    const errBox = document.getElementById('otp-error-msg');
+    const btn = document.getElementById('otp-verify-btn');
+
+    if (code.length < 6) {
+      if (errBox) {
+        errBox.innerText = 'Please enter all 6 digits.';
+        errBox.classList.remove('hidden');
+      }
+      return;
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = 'Verifying Code...';
+    }
+
+    try {
+      const res = await ApiClient.verifyOtp(
+        this.activeOtpData.target, 
+        this.activeOtpData.type, 
+        code, 
+        this.activeOtpData.userId
+      );
+
+      // Update current user state in store
+      if (store.currentUser) {
+        if (this.activeOtpData.type === 'mobile') {
+          store.currentUser.is_mobile_verified = true;
+        } else {
+          store.currentUser.is_email_verified = true;
+        }
+        localStorage.setItem('siri_user', JSON.stringify(store.currentUser));
+        store.notify('user_change', store.currentUser);
+      }
+
+      this.closeOtpModal();
+      alert(`✅ ${this.activeOtpData.type.toUpperCase()} verified successfully!`);
+
+      if (this.activeOtpData.onComplete) {
+        this.activeOtpData.onComplete();
+      }
+    } catch (err) {
+      if (errBox) {
+        errBox.innerText = err.message || 'Invalid verification code';
+        errBox.classList.remove('hidden');
+      }
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = 'Verify & Confirm';
+      }
+    }
+  },
+
+  closeOtpModal() {
+    clearInterval(this.otpTimerInterval);
+    document.getElementById('otp-modal')?.classList.add('hidden');
+  },
+
+  renderSignupVerifyModal() {
+    return `
+      <div id="signup-verify-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-100 relative max-h-[90vh] overflow-y-auto">
+          
+          <button onclick="App.closeSignupVerifyModal()" class="absolute top-5 right-5 text-slate-400 hover:text-slate-800 p-1 text-2xl font-bold leading-none" title="Close">
+            &times;
+          </button>
+
+          <div class="text-center mb-6">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 border border-teal-200 text-teal-800 text-xs font-mono font-bold uppercase tracking-wider">
+              <span>🛡️</span> Step 2 of 2: Security Verification
+            </span>
+            <h3 class="text-2xl font-black text-slate-900 mt-2 mb-1">Verify Mobile & Email</h3>
+            <p class="text-xs text-slate-500 leading-relaxed max-w-md mx-auto">
+              Real-world accounts require 2-factor identity confirmation. We have dispatched two separate 6-digit verification codes to verify your identity.
+            </p>
+          </div>
+
+          <!-- Real-Time Delivery Notice (No OTP on screen) -->
+          <div class="mb-5 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left flex items-start gap-3">
+            <span class="text-lg">📩</span>
+            <div class="text-xs text-slate-700 leading-tight">
+              <div class="font-bold text-slate-900">Separate Secure Codes Dispatched</div>
+              <p class="text-[11px] text-slate-500 mt-0.5">
+                Check your SMS inbox for the mobile code and your email inbox (including spam folder) for the email code.
+              </p>
+            </div>
+          </div>
+
+          <!-- 1. MOBILE VERIFICATION CARD -->
+          <div id="signup-mobile-card" class="mb-4 p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/60 transition-all">
+            <div class="flex items-center justify-between mb-2.5">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-xl bg-teal-100 text-teal-800 flex items-center justify-center font-bold text-sm">
+                  📱
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-slate-900">Mobile SMS Code</div>
+                  <div id="signup-mobile-target" class="text-[11px] text-slate-500 font-mono">+91 --</div>
+                </div>
+              </div>
+              <span id="signup-mobile-badge" class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                <span>⏳</span> Pending
+              </span>
+            </div>
+
+            <div id="signup-mobile-input-section" class="mt-3">
+              <div class="flex items-center gap-2">
+                <input type="text" id="signup-mobile-otp" maxlength="6" inputmode="numeric" placeholder="6-digit SMS OTP" 
+                  onkeydown="if(event.key==='Enter') App.verifySignupMobile()"
+                  class="flex-1 px-3.5 py-2.5 text-center font-mono tracking-widest text-base font-bold text-slate-900 bg-white rounded-xl border border-slate-200 focus:border-teal-600 focus:ring-2 focus:ring-teal-100 focus:outline-none transition-all">
+                <button type="button" id="signup-mobile-btn" onclick="App.verifySignupMobile()" 
+                  class="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs tracking-wide transition-all shadow-md shadow-teal-600/20 whitespace-nowrap">
+                  Verify Mobile
+                </button>
+              </div>
+              <div id="signup-mobile-err" class="hidden text-xs font-bold text-red-600 mt-2"></div>
+              <div class="mt-2.5 text-[11px] text-slate-500 flex items-center justify-between">
+                <span>Didn't get SMS?</span>
+                <button type="button" id="signup-mobile-resend-btn" onclick="App.resendSignupOtp('mobile')" disabled 
+                  class="font-bold text-teal-700 disabled:text-slate-400 disabled:cursor-not-allowed hover:underline">
+                  Resend SMS in <span id="signup-mobile-timer">30</span>s
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. EMAIL VERIFICATION CARD -->
+          <div id="signup-email-card" class="mb-5 p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/60 transition-all">
+            <div class="flex items-center justify-between mb-2.5">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-xl bg-teal-100 text-teal-800 flex items-center justify-center font-bold text-sm">
+                  ✉️
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-slate-900">Email Address Code</div>
+                  <div id="signup-email-target" class="text-[11px] text-slate-500 font-mono">--</div>
+                </div>
+              </div>
+              <span id="signup-email-badge" class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                <span>⏳</span> Pending
+              </span>
+            </div>
+
+            <div id="signup-email-input-section" class="mt-3">
+              <div class="flex items-center gap-2">
+                <input type="text" id="signup-email-otp" maxlength="6" inputmode="numeric" placeholder="6-digit Email OTP" 
+                  onkeydown="if(event.key==='Enter') App.verifySignupEmail()"
+                  class="flex-1 px-3.5 py-2.5 text-center font-mono tracking-widest text-base font-bold text-slate-900 bg-white rounded-xl border border-slate-200 focus:border-teal-600 focus:ring-2 focus:ring-teal-100 focus:outline-none transition-all">
+                <button type="button" id="signup-email-btn" onclick="App.verifySignupEmail()" 
+                  class="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs tracking-wide transition-all shadow-md shadow-teal-600/20 whitespace-nowrap">
+                  Verify Email
+                </button>
+              </div>
+              <div id="signup-email-err" class="hidden text-xs font-bold text-red-600 mt-2"></div>
+              <div class="mt-2.5 text-[11px] text-slate-500 flex items-center justify-between">
+                <span>Didn't get Email?</span>
+                <button type="button" id="signup-email-resend-btn" onclick="App.resendSignupOtp('email')" disabled 
+                  class="font-bold text-teal-700 disabled:text-slate-400 disabled:cursor-not-allowed hover:underline">
+                  Resend Email in <span id="signup-email-timer">30</span>s
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. COMPLETION CTA -->
+          <button type="button" id="signup-complete-btn" onclick="App.completeSignupActivation()" disabled
+            class="w-full py-3.5 rounded-2xl bg-slate-200 text-slate-400 font-black text-sm tracking-wide transition-all cursor-not-allowed flex items-center justify-center gap-2">
+            <span>🔒 Verify Both Mobile & Email to Complete</span>
+          </button>
+
+          <div class="text-center mt-3">
+            <button type="button" onclick="App.closeSignupVerifyModal()" class="text-xs text-slate-400 hover:text-slate-600">
+              Cancel and verify later
+            </button>
+          </div>
+
+        </div>
+      </div>
+    `;
+  },
+
+  signupPending: null,
+
+  launchSignupDualVerification(user, phone, email) {
+    this.signupPending = {
+      user: user,
+      phone: phone,
+      email: email,
+      mobileVerified: false,
+      emailVerified: false,
+      mobileInterval: null,
+      emailInterval: null
+    };
+
+    const modal = document.getElementById('signup-verify-modal');
+    const mTarget = document.getElementById('signup-mobile-target');
+    const eTarget = document.getElementById('signup-email-target');
+    const mInput = document.getElementById('signup-mobile-otp');
+    const eInput = document.getElementById('signup-email-otp');
+    const mErr = document.getElementById('signup-mobile-err');
+    const eErr = document.getElementById('signup-email-err');
+
+    if (mTarget) mTarget.innerText = phone ? `+91 ${phone}` : 'No phone provided';
+    if (eTarget) eTarget.innerText = email;
+    if (mInput) mInput.value = '';
+    if (eInput) eInput.value = '';
+    if (mErr) mErr.classList.add('hidden');
+    if (eErr) eErr.classList.add('hidden');
+
+    this.resetSignupVerificationUI();
+
+    if (modal) modal.classList.remove('hidden');
+
+    // Start 30s countdowns for both channels
+    this.startSignupCooldown('mobile', 30);
+    this.startSignupCooldown('email', 30);
+
+    setTimeout(() => {
+      if (mInput) mInput.focus();
+    }, 150);
+  },
+
+  resetSignupVerificationUI() {
+    const mBadge = document.getElementById('signup-mobile-badge');
+    const eBadge = document.getElementById('signup-email-badge');
+    const mCard = document.getElementById('signup-mobile-card');
+    const eCard = document.getElementById('signup-email-card');
+    const mInputSec = document.getElementById('signup-mobile-input-section');
+    const eInputSec = document.getElementById('signup-email-input-section');
+    const completeBtn = document.getElementById('signup-complete-btn');
+
+    if (mBadge) {
+      mBadge.className = 'px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1';
+      mBadge.innerHTML = '<span>⏳</span> Pending';
+    }
+    if (eBadge) {
+      eBadge.className = 'px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1';
+      eBadge.innerHTML = '<span>⏳</span> Pending';
+    }
+    if (mCard) mCard.className = 'mb-4 p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/60 transition-all';
+    if (eCard) eCard.className = 'mb-5 p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/60 transition-all';
+    if (mInputSec) mInputSec.style.display = 'block';
+    if (eInputSec) eInputSec.style.display = 'block';
+
+    if (completeBtn) {
+      completeBtn.disabled = true;
+      completeBtn.className = 'w-full py-3.5 rounded-2xl bg-slate-200 text-slate-400 font-black text-sm tracking-wide transition-all cursor-not-allowed flex items-center justify-center gap-2';
+      completeBtn.innerHTML = '<span>🔒 Verify Both Mobile & Email to Complete</span>';
+    }
+  },
+
+  startSignupCooldown(channel, seconds = 30) {
+    const btn = document.getElementById(`signup-${channel}-resend-btn`);
+    const timerDisp = document.getElementById(`signup-${channel}-timer`);
+    if (!btn) return;
+
+    btn.disabled = true;
+    let remaining = seconds;
+    if (timerDisp) timerDisp.innerText = remaining;
+
+    const intervalKey = `${channel}Interval`;
+    if (this.signupPending && this.signupPending[intervalKey]) {
+      clearInterval(this.signupPending[intervalKey]);
+    }
+
+    const interval = setInterval(() => {
+      remaining -= 1;
+      if (timerDisp) timerDisp.innerText = remaining;
+      if (remaining <= 0) {
+        clearInterval(interval);
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = `Resend ${channel === 'mobile' ? 'SMS' : 'Email'} Now`;
+        }
+      }
+    }, 1000);
+
+    if (this.signupPending) {
+      this.signupPending[intervalKey] = interval;
+    }
+  },
+
+  async resendSignupOtp(channel) {
+    if (!this.signupPending) return;
+    const target = channel === 'mobile' ? this.signupPending.phone : this.signupPending.email;
+    const btn = document.getElementById(`signup-${channel}-resend-btn`);
+    const errBox = document.getElementById(`signup-${channel}-err`);
+    if (errBox) errBox.classList.add('hidden');
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = 'Sending...';
+    }
+
+    try {
+      await ApiClient.sendOtp(target, channel, this.signupPending.user?.id);
+      this.startSignupCooldown(channel, 30);
+    } catch (err) {
+      if (errBox) {
+        errBox.innerText = err.message || 'Failed to resend code';
+        errBox.classList.remove('hidden');
+      }
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = `Resend ${channel === 'mobile' ? 'SMS' : 'Email'} Now`;
+      }
+    }
+  },
+
+  async verifySignupMobile() {
+    if (!this.signupPending) return;
+    const input = document.getElementById('signup-mobile-otp');
+    const code = input?.value.trim();
+    const btn = document.getElementById('signup-mobile-btn');
+    const errBox = document.getElementById('signup-mobile-err');
+    const badge = document.getElementById('signup-mobile-badge');
+    const card = document.getElementById('signup-mobile-card');
+    const inputSec = document.getElementById('signup-mobile-input-section');
+
+    if (errBox) errBox.classList.add('hidden');
+
+    if (!code || code.length < 6) {
+      if (errBox) {
+        errBox.innerText = 'Please enter all 6 digits of the SMS code.';
+        errBox.classList.remove('hidden');
+      }
+      return;
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = 'Verifying...';
+    }
+
+    try {
+      await ApiClient.verifyOtp(this.signupPending.phone, 'mobile', code, this.signupPending.user?.id);
+      this.signupPending.mobileVerified = true;
+
+      // Update UI for Mobile card
+      if (badge) {
+        badge.className = 'px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1';
+        badge.innerHTML = '<span>✓</span> Mobile Verified';
+      }
+      if (card) {
+        card.className = 'mb-4 p-4 rounded-2xl border-2 border-emerald-200 bg-emerald-50/40 transition-all';
+      }
+      if (inputSec) {
+        inputSec.innerHTML = `<div class="text-xs font-bold text-emerald-800 flex items-center gap-1.5 py-1"><span>✅</span> Mobile number verified successfully!</div>`;
+      }
+
+      this.checkSignupCompletion();
+    } catch (err) {
+      if (errBox) {
+        errBox.innerText = err.message || 'Invalid SMS verification code.';
+        errBox.classList.remove('hidden');
+      }
+    } finally {
+      if (btn && !this.signupPending.mobileVerified) {
+        btn.disabled = false;
+        btn.innerText = 'Verify Mobile';
+      }
+    }
+  },
+
+  async verifySignupEmail() {
+    if (!this.signupPending) return;
+    const input = document.getElementById('signup-email-otp');
+    const code = input?.value.trim();
+    const btn = document.getElementById('signup-email-btn');
+    const errBox = document.getElementById('signup-email-err');
+    const badge = document.getElementById('signup-email-badge');
+    const card = document.getElementById('signup-email-card');
+    const inputSec = document.getElementById('signup-email-input-section');
+
+    if (errBox) errBox.classList.add('hidden');
+
+    if (!code || code.length < 6) {
+      if (errBox) {
+        errBox.innerText = 'Please enter all 6 digits of the Email code.';
+        errBox.classList.remove('hidden');
+      }
+      return;
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = 'Verifying...';
+    }
+
+    try {
+      await ApiClient.verifyOtp(this.signupPending.email, 'email', code, this.signupPending.user?.id);
+      this.signupPending.emailVerified = true;
+
+      // Update UI for Email card
+      if (badge) {
+        badge.className = 'px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1';
+        badge.innerHTML = '<span>✓</span> Email Verified';
+      }
+      if (card) {
+        card.className = 'mb-5 p-4 rounded-2xl border-2 border-emerald-200 bg-emerald-50/40 transition-all';
+      }
+      if (inputSec) {
+        inputSec.innerHTML = `<div class="text-xs font-bold text-emerald-800 flex items-center gap-1.5 py-1"><span>✅</span> Email address verified successfully!</div>`;
+      }
+
+      this.checkSignupCompletion();
+    } catch (err) {
+      if (errBox) {
+        errBox.innerText = err.message || 'Invalid Email verification code.';
+        errBox.classList.remove('hidden');
+      }
+    } finally {
+      if (btn && !this.signupPending.emailVerified) {
+        btn.disabled = false;
+        btn.innerText = 'Verify Email';
+      }
+    }
+  },
+
+  checkSignupCompletion() {
+    if (!this.signupPending) return;
+    const completeBtn = document.getElementById('signup-complete-btn');
+
+    if (this.signupPending.mobileVerified && this.signupPending.emailVerified) {
+      if (completeBtn) {
+        completeBtn.disabled = false;
+        completeBtn.className = 'w-full py-3.5 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white font-black text-sm tracking-wide transition-all shadow-lg shadow-teal-600/30 cursor-pointer flex items-center justify-center gap-2';
+        completeBtn.innerHTML = '<span>🎉 All Verified — Enter Siri Sofa Services &rarr;</span>';
+      }
+    }
+  },
+
+  completeSignupActivation() {
+    if (!this.signupPending || !this.signupPending.mobileVerified || !this.signupPending.emailVerified) {
+      alert('Please verify both your mobile number and email before proceeding.');
+      return;
+    }
+
+    const user = {
+      ...this.signupPending.user,
+      is_mobile_verified: true,
+      is_email_verified: true
+    };
+
+    store.setUser(user);
+    this.closeSignupVerifyModal();
+
+    alert(`🎉 Account fully activated, ${user.name}! Welcome to Siri Sofa Services Hyderabad.`);
+    if (store.currentView === 'book') {
+      BookingWizardComponent.refresh();
+    } else {
+      store.setView('customer');
+    }
+  },
+
+  closeSignupVerifyModal() {
+    if (this.signupPending) {
+      if (this.signupPending.mobileInterval) clearInterval(this.signupPending.mobileInterval);
+      if (this.signupPending.emailInterval) clearInterval(this.signupPending.emailInterval);
+      this.signupPending = null;
+    }
+    document.getElementById('signup-verify-modal')?.classList.add('hidden');
+  },
+
+  async handleRegister(e) {
+    e.preventDefault();
+    const name = document.getElementById('reg-name')?.value.trim();
+    const phone = document.getElementById('reg-phone')?.value.trim();
+    const email = document.getElementById('reg-email')?.value.trim();
+    const password = document.getElementById('reg-password')?.value;
+    const area = document.getElementById('reg-area')?.value;
+    const btn = document.getElementById('reg-submit-btn');
+
+    if (!name || !email || !password || !phone) {
+      alert("Please fill in all required fields, including mobile number.");
+      return;
+    }
+
+    if (btn) {
+      btn.innerHTML = `<span class="animate-spin">⏳</span> Creating Account & Dispatching OTPs...`;
+      btn.disabled = true;
+    }
+
+    try {
+      const res = await ApiClient.register(name, email, phone, password);
+      // Remember area choice for booking flow
+      store.wizard.address.area = area || 'Banjara Hills';
+      store.wizard.address.city = 'Hyderabad';
+
+      // Hide auth modal and launch dual verification step
+      document.getElementById('auth-modal')?.classList.add('hidden');
+      this.launchSignupDualVerification(res.user, phone, email);
+    } catch (err) {
+      alert(`Registration failed: ${err.message}`);
+    } finally {
+      if (btn) {
+        btn.innerHTML = `Create My Account & Continue`;
+        btn.disabled = false;
+      }
+    }
+  },
+
+  async handleLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById('auth-email')?.value.trim();
+    const password = document.getElementById('auth-password')?.value;
+    const btn = document.getElementById('auth-submit-btn');
+
+    if (btn) {
+      btn.innerHTML = `<span class="animate-spin">⏳</span> Authenticating...`;
+      btn.disabled = true;
+    }
+
+    try {
+      const res = await ApiClient.login(email, password);
+      store.setUser(res.user);
+      document.getElementById('auth-modal')?.classList.add('hidden');
+      
+      if (res.user.role === 'admin') {
+        store.setView('admin');
+      } else if (store.currentView === 'book') {
+        BookingWizardComponent.refresh();
+      } else {
+        store.setView('customer');
+      }
+    } catch (err) {
+      alert(`Login failed: ${err.message}`);
+    } finally {
+      if (btn) {
+        btn.innerHTML = `Sign In to Account`;
+        btn.disabled = false;
+      }
+    }
+  }
+};
+
+window.App = App;
+
+// Bootstrap on DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+  App.init();
+});

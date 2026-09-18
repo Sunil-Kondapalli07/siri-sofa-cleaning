@@ -1,0 +1,177 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-display: 'Outfit', system-ui, -apple-system, sans-serif;
+  --primary: #0d9488;
+  --primary-dark: #0f766e;
+  --primary-light: #ccfbf1;
+  --accent: #10b981;
+  --accent-dark: #059669;
+  --dark-slate: #0f172a;
+  --light-bg: #f8fafc;
+  --card-border: #e2e8f0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #f8fafc;
+  color: #0f172a;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-display);
+}
+
+/* Glassmorphism effects */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.glass-panel-dark {
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+/* Custom 3D Canvas Container */
+.three-canvas-wrapper {
+  position: relative;
+  width: 100%;
+  height: 480px;
+  background: radial-gradient(circle at center, #f1f5f9 0%, #e2e8f0 100%);
+  border-radius: 1.5rem;
+  overflow: hidden;
+  box-shadow: 0 20px 35px -10px rgba(15, 118, 110, 0.12), 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+}
+
+@media (max-width: 768px) {
+  .three-canvas-wrapper {
+    height: 340px;
+  }
+}
+
+/* Before / After Slider */
+.ba-container {
+  position: relative;
+  overflow: hidden;
+  user-select: none;
+  border-radius: 1rem;
+}
+
+.ba-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.ba-slider-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background-color: #0d9488;
+  cursor: ew-resize;
+  transform: translateX(-50%);
+}
+
+.ba-slider-button {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  background-color: white;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0f766e;
+  font-weight: bold;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Pulse animation for active tracker node */
+@keyframes tracker-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(13, 148, 136, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(13, 148, 136, 0);
+  }
+}
+
+.pulse-node {
+  animation: tracker-pulse 2s infinite;
+}
+
+/* Step Progress Connector */
+.step-line {
+  height: 3px;
+  flex: 1;
+  background-color: #e2e8f0;
+  transition: background-color 0.3s ease;
+}
+
+.step-line.active {
+  background: linear-gradient(to right, #0d9488, #10b981);
+}
+
+/* Custom badge transitions */
+.badge-status-received {
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+.badge-status-confirmed {
+  background-color: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+.badge-status-assigned {
+  background-color: #e0e7ff;
+  color: #3730a3;
+  border: 1px solid #c7d2fe;
+}
+.badge-status-cleaning_started {
+  background-color: #fef9c3;
+  color: #854d0e;
+  border: 1px solid #fef08a;
+}
+.badge-status-completed {
+  background-color: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+.badge-status-cancelled {
+  background-color: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}

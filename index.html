@@ -1,20 +1,67 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Siri Sofa Cleaning Solutions — Fresh Sofa. Fresh Home.</title>
-  <meta http-equiv="refresh" content="0; url=frontend/">
+  <title>Siri Sofa Services — Fresh Sofa. Fresh Home. | 3D Doorstep Cleaning</title>
+  <meta name="description" content="Professional 3D sofa, chair, mattress and carpet deep extraction cleaning at your doorstep. Hospital-grade 6-step hygiene process in Hyderabad, Bengaluru & Mumbai.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛋️</text></svg>">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    window.location.replace("frontend/" + window.location.hash);
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            teal: {
+              50: '#f0fdfa',
+              100: '#ccfbf1',
+              200: '#99f6e4',
+              300: '#5eead4',
+              400: '#2dd4bf',
+              500: '#14b8a6',
+              600: '#0d9488',
+              700: '#0f766e',
+              800: '#115e59',
+              900: '#134e4a',
+              950: '#042f2e',
+            }
+          }
+        }
+      }
+    }
   </script>
+
+  <!-- Google Fonts & Custom CSS -->
+  <link rel="stylesheet" href="css/styles.css?v=20260918-authgate">
+
+  <!-- Leaflet.js (Free OpenStreetMap Interactive Maps) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Three.js and OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
-<body style="margin: 0; background: #042f2e; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; text-align: center;">
-  <div>
-    <div style="font-size: 48px; margin-bottom: 12px;">🛋️</div>
-    <h1 style="font-size: 24px; margin-bottom: 8px; color: #2dd4bf;">Siri Sofa Cleaning Solutions</h1>
-    <p style="color: #99f6e4; font-size: 14px; margin-bottom: 16px;">Loading 3D Experience...</p>
-    <a href="frontend/" style="color: #5eead4; text-decoration: underline; font-size: 13px;">Click here if not redirected automatically &rarr;</a>
-  </div>
+<body class="bg-slate-50 antialiased text-slate-900 selection:bg-teal-500 selection:text-white">
+  
+  <!-- Root App Container -->
+  <div id="app"></div>
+
+  <!-- Application Logic Modules -->
+  <script src="js/api.js?v=20260918-authgate"></script>
+  <script src="js/store.js?v=20260918-authgate"></script>
+  <script src="js/three-sofa.js?v=20260918-authgate"></script>
+  <script src="js/components/navbar.js?v=20260918-authgate"></script>
+  <script src="js/components/hero.js?v=20260918-authgate"></script>
+  <script src="js/components/hygiene-process.js?v=20260918-authgate"></script>
+  <script src="js/components/service-selector.js?v=20260918-authgate"></script>
+  <script src="js/components/booking-wizard.js?v=20260918-authgate"></script>
+  <script src="js/components/booking-tracker.js?v=20260918-authgate"></script>
+  <script src="js/components/customer-portal.js?v=20260918-authgate"></script>
+  <script src="js/components/admin-portal.js?v=20260918-authgate"></script>
+  <script src="js/components/reviews-faq.js?v=20260918-authgate"></script>
+  <script src="js/app.js?v=20260918-authgate"></script>
 </body>
 </html>
