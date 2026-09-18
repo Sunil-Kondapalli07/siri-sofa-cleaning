@@ -402,7 +402,14 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 cursor = conn.cursor()
                 cursor.execute("SELECT id FROM users WHERE LOWER(email) = ?", (email,))
                 if cursor.fetchone():
-                    return self.send_json(400, {'error': 'Account with this email already exists'})
+                    return self.send_json(400, {'error': 'User already exists with this email address. Please sign in instead.', 'field': 'email'})
+
+                if phone:
+                    clean_phone = phone.replace('+91', '').replace(' ', '').replace('-', '').strip()
+                    if len(clean_phone) >= 10:
+                        cursor.execute("SELECT id FROM users WHERE phone LIKE ?", (f"%{clean_phone[-10:]}",))
+                        if cursor.fetchone():
+                            return self.send_json(400, {'error': 'User already exists with this mobile number. Please sign in instead.', 'field': 'phone'})
 
                 pw_hash = hash_password(password)
                 cursor.execute("""
