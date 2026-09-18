@@ -6,6 +6,32 @@ const BookingTrackerComponent = {
   currentBooking: null,
   isLoading: false,
 
+  reset() {
+    this.currentBooking = null;
+    this.isLoading = false;
+    if (this.map) {
+      try {
+        this.map.remove();
+      } catch (e) {
+        console.warn("Tracker map cleanup notice", e);
+      }
+      this.map = null;
+    }
+    const input = document.getElementById('track-id-input');
+    if (input) input.value = '';
+    const errEl = document.getElementById('track-search-error');
+    if (errEl) {
+      errEl.textContent = '';
+      errEl.classList.add('hidden');
+    }
+    const host = document.getElementById('tracker-content-host');
+    if (host) {
+      host.innerHTML = this.renderInitialSearchPrompt();
+    }
+    document.getElementById('invoice-modal')?.remove();
+    document.getElementById('reschedule-modal')?.remove();
+  },
+
   render() {
     return `
       <section class="py-12 bg-slate-50 min-h-screen">

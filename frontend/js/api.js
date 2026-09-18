@@ -341,6 +341,8 @@ const ApiClient = {
   logout() {
     localStorage.removeItem('siri_token');
     localStorage.removeItem('siri_user');
+    localStorage.removeItem('siri_active_otps');
+    localStorage.removeItem('siri_demo_otps');
   },
 
   getCurrentUser() {

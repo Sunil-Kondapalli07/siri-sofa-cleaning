@@ -197,7 +197,7 @@ const App = {
         if (store.trackingBookingId) {
           BookingTrackerComponent.loadBooking(store.trackingBookingId);
         } else {
-          BookingTrackerComponent.renderInitialSearchPrompt();
+          BookingTrackerComponent.reset();
         }
       }, 50);
 

@@ -356,9 +356,12 @@ const CustomerPortalComponent = {
           </div>
         </div>
 
-        <div class="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between">
-          <div class="text-xs text-slate-500">Need help? 24/7 Hyderabad Support available</div>
-          <a href="https://wa.me/919800000000" target="_blank" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors flex items-center gap-1.5 shadow-sm">
+        <div class="mt-8 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <button onclick="NavbarComponent.handleLogout()" class="px-4 py-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs border border-red-200 transition-colors flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+            <span>Sign Out of Account</span>
+          </button>
+          <a href="https://wa.me/919800000000" target="_blank" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors flex items-center gap-1.5 shadow-sm">
             <span>WhatsApp Dispatch Support</span>
           </a>
         </div>

@@ -987,9 +987,8 @@ const BookingWizardComponent = {
 
       const res = await ApiClient.createBooking(bookingPayload);
       store.wizard.lastCreatedBookingId = res.booking_id;
-      store.trackingBookingId = res.booking_id;
 
-      // Reset wizard and navigate to Tracking
+      // Reset wizard and present confirmation modal
       store.resetWizard();
       BookingWizardComponent.renderSuccessModal(res.booking_id, res.total_amount);
 
@@ -1021,7 +1020,7 @@ const BookingWizardComponent = {
               <span>Track Live Booking Status</span>
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
             </button>
-            <button onclick="document.getElementById('booking-success-modal').remove(); store.setView('home');" class="w-full py-2.5 text-slate-500 hover:text-slate-800 text-xs font-semibold">
+            <button onclick="document.getElementById('booking-success-modal').remove(); store.trackingBookingId = null; store.setView('home');" class="w-full py-2.5 text-slate-500 hover:text-slate-800 text-xs font-semibold">
               Return to Home
             </button>
           </div>

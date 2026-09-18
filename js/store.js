@@ -75,11 +75,43 @@ class AppStore {
   }
 
   setUser(user) {
+    const previousUserId = this.currentUser ? this.currentUser.id : null;
     this.currentUser = user;
     if (user) {
       this.wizard.address.name = user.name || '';
       this.wizard.address.email = user.email || '';
       this.wizard.address.phone = user.phone || '';
+      // If user switched accounts, isolate tracking state
+      if (previousUserId && previousUserId !== user.id) {
+        this.trackingBookingId = null;
+        this.trackedBooking = null;
+        if (window.BookingTrackerComponent && typeof window.BookingTrackerComponent.reset === 'function') {
+          window.BookingTrackerComponent.reset();
+        }
+      }
+    } else {
+      // Complete state cleanup upon logout
+      this.trackingBookingId = null;
+      this.trackedBooking = null;
+      this.wizard.address = {
+        name: '',
+        phone: '',
+        email: '',
+        house_flat: '',
+        street: '',
+        area: '',
+        city: 'Hyderabad',
+        pincode: '',
+        instructions: ''
+      };
+      this.wizard.lastCreatedBookingId = null;
+      this.resetWizard();
+      if (window.BookingTrackerComponent && typeof window.BookingTrackerComponent.reset === 'function') {
+        window.BookingTrackerComponent.reset();
+      }
+      if (window.CustomerPortalComponent) {
+        window.CustomerPortalComponent.customerBookings = [];
+      }
     }
     this.notify('user_change', user);
   }

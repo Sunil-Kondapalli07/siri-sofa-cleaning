@@ -260,6 +260,13 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 if not row:
                     return self.send_json(404, {'error': f'Booking {booking_id} not found'})
                 b_dict = dict(row)
+
+                # Authorization check: Authenticated customer can only access their own booking
+                caller = self.get_authenticated_user(conn)
+                if caller and caller.get('role') == 'customer':
+                    if b_dict.get('user_id') and str(b_dict.get('user_id')) != str(caller['id']):
+                        return self.send_json(403, {'error': 'Access denied: You are not authorized to view this booking.'})
+
                 try:
                     b_dict['address'] = json.loads(b_dict['address_json'])
                 except Exception:
