@@ -102,6 +102,18 @@ const NavbarComponent = {
   handleLogout() {
     ApiClient.logout();
     store.setUser(null);
+    store.trackingBookingId = null;
+    store.trackedBooking = null;
+    if (window.BookingTrackerComponent && typeof window.BookingTrackerComponent.reset === 'function') {
+      window.BookingTrackerComponent.reset();
+    }
+    if (window.CustomerPortalComponent) {
+      window.CustomerPortalComponent.customerBookings = [];
+    }
+    // Dismiss any orphaned dialogs/modals
+    document.getElementById('booking-success-modal')?.remove();
+    document.getElementById('invoice-modal')?.remove();
+    document.getElementById('reschedule-modal')?.remove();
     store.setView('home');
   },
 

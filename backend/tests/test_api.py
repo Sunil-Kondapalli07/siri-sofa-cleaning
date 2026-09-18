@@ -300,6 +300,20 @@ class DirectHandlerTest(unittest.TestCase):
         self.assertEqual(status, 401)
         self.assertIn('Sign in required', body['error'])
 
+    def test_04c_customer_cross_booking_access_forbidden(self):
+        # Customer B (user_id 3) attempting to access Customer A's (user_id 2) booking by ID must receive 403 Forbidden
+        booking_id = DirectHandlerTest.created_booking_id
+        cust3_token = 'token_3_1700000000'
+        status, body = self.invoke_api('GET', f'/api/bookings/{booking_id}', headers_dict={'Authorization': f'Bearer {cust3_token}'})
+        self.assertEqual(status, 403)
+        self.assertIn('Access denied', body['error'])
+
+        # Owner (user_id 2) accessing their own booking must succeed with 200
+        cust2_token = 'token_2_1700000000'
+        status, body = self.invoke_api('GET', f'/api/bookings/{booking_id}', headers_dict={'Authorization': f'Bearer {cust2_token}'})
+        self.assertEqual(status, 200)
+        self.assertEqual(body['booking']['id'], booking_id)
+
     def test_05_admin_pricing_and_assignment(self):
         _, p_body = self.invoke_api('GET', '/api/pricing')
         target_variant = p_body['variants'][0]
