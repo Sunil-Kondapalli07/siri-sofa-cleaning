@@ -512,6 +512,56 @@ h1, h2, h3, h4, h5, h6, .font-display {
   z-index: 1;
 }
 
+/* ==========================================================================
+   Next-Gen 3D WebGL Scrollytelling Styles
+   ========================================================================== */
+.sofa-3d-viewport {
+  position: relative;
+  width: 100%;
+  height: 520px;
+  background: radial-gradient(circle at 50% 45%, #FFFFFF 0%, #F5F3ED 65%, #EBE6DA 100%);
+  border-radius: 1.75rem;
+  overflow: hidden;
+  box-shadow: 0 24px 48px -12px rgba(12, 74, 52, 0.12), 0 4px 16px -2px rgba(18, 24, 32, 0.05);
+  border: 1px solid rgba(18, 24, 32, 0.08);
+}
+
+@media (max-width: 640px) {
+  .sofa-3d-viewport {
+    height: 420px;
+  }
+}
+
+.swatch-btn {
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.swatch-btn:hover {
+  transform: scale(1.15);
+}
+
+.swatch-btn.swatch-active {
+  transform: scale(1.2);
+  box-shadow: 0 0 0 3px #FFFFFF, 0 0 0 5px #0C4A34;
+}
+
+.scrolly-phase-card {
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.scrolly-phase-card.active-phase {
+  border-color: #0C4A34;
+  background-color: #F2F8F5;
+  box-shadow: 0 12px 28px -6px rgba(12, 74, 52, 0.15);
+  transform: translateY(-4px);
+}
+
+.scrolly-phase-card.active-phase .phase-num {
+  background-color: #0C4A34;
+  color: #FFFFFF;
+}
+
 /* Accessibility: Reduced motion settings */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -523,3 +573,4 @@ h1, h2, h3, h4, h5, h6, .font-display {
     scroll-behavior: auto !important;
   }
 }
+
