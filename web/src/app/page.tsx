@@ -4,14 +4,9 @@ import React, { useState, useEffect } from "react";
 import { Service, ServiceVariant, CartItem, User } from "@/types";
 import { api } from "@/lib/api";
 import { ScrollProgress } from "@/components/ScrollProgress";
-import { SectionNavigator } from "@/components/SectionNavigator";
 import { Navbar } from "@/components/Navbar";
-import { Hero } from "@/components/Hero";
-import { EmotionalStory } from "@/components/EmotionalStory";
-import { BeforeAfterSlider } from "@/components/BeforeAfterSlider";
-import { ServiceSelector } from "@/components/ServiceSelector";
+import { ShowroomStoryContainer } from "@/components/showroom/ShowroomStoryContainer";
 import { HygieneProcess } from "@/components/HygieneProcess";
-import { Features } from "@/components/Features";
 import { ReviewsFaq } from "@/components/ReviewsFaq";
 import { Footer } from "@/components/Footer";
 import { BookingWizardModal } from "@/components/BookingWizardModal";
@@ -91,9 +86,6 @@ export default function Home() {
       {/* Top Scroll Reading Depth Progress Bar */}
       <ScrollProgress />
 
-      {/* Floating Active Section Pill & Smooth Jump Navigator */}
-      <SectionNavigator />
-
       {/* Navigation Bar */}
       <Navbar
         user={user}
@@ -104,40 +96,22 @@ export default function Home() {
         onLogout={handleLogout}
       />
 
-      {/* Main Content Sections */}
+      {/* Continuous 3D Digital Showroom & Brand Film Experience */}
       <main className="flex-1">
-        {/* 1. Cinematic Luxury Penthouse Hero with Atmosphere & Hotspots */}
-        <Hero
-          onBookNow={() => setIsBookingOpen(true)}
-          onExploreServices={() => {
-            document.getElementById("services")?.scrollIntoView({ behavior: "smooth" });
-          }}
-        />
-
-        {/* 2. Emotional Story: The Heart of the Home */}
-        <EmotionalStory
-          onBookNow={() => setIsBookingOpen(true)}
-        />
-
-        {/* 3. Interactive Before & After Comparison Slider */}
-        <BeforeAfterSlider />
-
-        {/* 4. Interactive Dynamic Services Catalog & Customizer */}
-        <ServiceSelector
+        <ShowroomStoryContainer
           services={services}
           cart={cart}
           pricingConfig={pricingConfig}
           onUpdateQuantity={handleUpdateQuantity}
-          onProceedToBooking={() => setIsBookingOpen(true)}
+          onOpenBooking={() => setIsBookingOpen(true)}
+          onOpenTracking={() => setIsTrackerOpen(true)}
+          user={user}
         />
 
-        {/* 5. 6-Step Clinical Hygiene Protocol */}
+        {/* Clinical Proof Protocol */}
         <HygieneProcess />
 
-        {/* 6. How It Works & Why Choose Siri */}
-        <Features />
-
-        {/* 7. Verified Customer Reviews & Accordion FAQs */}
+        {/* Verified Hyderabad Customer Reviews & Accordion FAQs */}
         <ReviewsFaq />
       </main>
 
