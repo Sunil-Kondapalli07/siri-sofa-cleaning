@@ -45,6 +45,15 @@ const ApiClient = {
     }
   },
 
+  _hashPassword(password) {
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < (password || '').length; i++) {
+      hash ^= password.charCodeAt(i);
+      hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+    }
+    return 'demo_pwd_' + (hash >>> 0).toString(16);
+  },
+
   handleStaticFallback(endpoint, options = {}) {
     const method = (options.method || 'GET').toUpperCase();
     const body = options.body ? JSON.parse(options.body) : {};
@@ -77,8 +86,138 @@ const ApiClient = {
       if (code === 'SIRI20') return { valid: true, discount_percent: 20, message: '20% Discount Applied' };
       throw new Error('Invalid coupon code');
     }
-    if (endpoint.startsWith('/api/auth/')) {
-      throw new Error('Authentication, registration and OTP operations require connecting to the live Siri Sofa API server. Please ensure the backend is running at http://localhost:8000.');
+    if (endpoint === '/api/auth/register') {
+      const users = JSON.parse(localStorage.getItem('siri_users') || '[]');
+      const regEmail = (body.email || '').trim().toLowerCase();
+      const regPhone = (body.phone || '').replace(/[^0-9]/g, '').slice(-10);
+
+      if (!body.name || !regEmail || !body.password) {
+        throw new Error('Name, email and password are required');
+      }
+
+      if (regEmail === 'admin@sirisofa.com' || users.some(u => (u.email || '').toLowerCase() === regEmail)) {
+        throw new Error('User already exists with this email address. Please sign in instead.');
+      }
+      if (regPhone && (regPhone === '9800000000' || users.some(u => (u.phone || '').replace(/[^0-9]/g, '').slice(-10) === regPhone))) {
+        throw new Error('User already exists with this mobile number. Please sign in instead.');
+      }
+
+      const mCode = String(Math.floor(100000 + Math.random() * 900000));
+      const eCode = String(Math.floor(100000 + Math.random() * 900000));
+      const activeOtps = JSON.parse(localStorage.getItem('siri_active_otps') || '{}');
+      if (body.phone) activeOtps[body.phone] = { code: mCode, attempts: 0, created_at: Date.now() };
+      if (body.email) activeOtps[regEmail] = { code: eCode, attempts: 0, created_at: Date.now() };
+      localStorage.setItem('siri_active_otps', JSON.stringify(activeOtps));
+
+      const u = {
+        id: Date.now(),
+        name: body.name || 'Customer',
+        email: body.email,
+        phone: body.phone,
+        password_hash: this._hashPassword(body.password),
+        role: 'customer',
+        is_email_verified: false,
+        is_mobile_verified: false
+      };
+      users.push(u);
+      localStorage.setItem('siri_users', JSON.stringify(users));
+
+      return { 
+        success: true, 
+        user: u, 
+        token: `demo_token_${u.id}_${Date.now()}`, 
+        requires_verification: true,
+        dev_mobile_code: mCode,
+        dev_email_code: eCode,
+        mobile_delivered: false,
+        email_delivered: false,
+        message: 'Account created! Verification codes dispatched.'
+      };
+    }
+    if (endpoint === '/api/auth/login') {
+      const email = (body.email || '').trim().toLowerCase();
+      const pwd = body.password || '';
+      const isAdmin = email === 'admin@sirisofa.com' && this._hashPassword(pwd) === this._hashPassword('admin123');
+      const users = JSON.parse(localStorage.getItem('siri_users') || '[]');
+      const foundUser = users.find(u => 
+        (u.email && u.email.toLowerCase() === email) ||
+        (u.phone && u.phone.replace(/[^0-9]/g, '').slice(-10) === email.replace(/[^0-9]/g, '').slice(-10))
+      );
+
+      if (!isAdmin && (!foundUser || foundUser.password_hash !== this._hashPassword(pwd))) {
+        throw new Error('Invalid email or password. Please check your credentials or create an account.');
+      }
+
+      const u = isAdmin ? {
+        id: 1,
+        name: 'Siri Operations Admin',
+        email: 'admin@sirisofa.com',
+        phone: '+91 98000 00000',
+        role: 'admin',
+        is_email_verified: true,
+        is_mobile_verified: true
+      } : foundUser;
+
+      return { success: true, user: u, token: `demo_token_${u.id}_${Date.now()}` };
+    }
+    if (endpoint === '/api/auth/logout') {
+      return { success: true, message: 'Logged out successfully' };
+    }
+    if (endpoint === '/api/auth/otp/send') {
+      const target = (body.target || '').trim();
+      const code = String(Math.floor(100000 + Math.random() * 900000));
+      const activeOtps = JSON.parse(localStorage.getItem('siri_active_otps') || '{}');
+      activeOtps[target] = { code: code, attempts: 0, created_at: Date.now() };
+      if (target.includes('@')) activeOtps[target.toLowerCase()] = { code: code, attempts: 0, created_at: Date.now() };
+      localStorage.setItem('siri_active_otps', JSON.stringify(activeOtps));
+      return { 
+        success: true, 
+        message: `Verification code sent to ${target}`, 
+        dev_code: code, 
+        delivered: false 
+      };
+    }
+    if (endpoint === '/api/auth/otp/verify') {
+      const target = (body.target || '').trim();
+      const submittedCode = String(body.otp_code || '').trim();
+      const activeOtps = JSON.parse(localStorage.getItem('siri_active_otps') || '{}');
+      const record = activeOtps[target] || (target.includes('@') ? activeOtps[target.toLowerCase()] : null);
+
+      if (!record) {
+        throw new Error('No active verification code found for this destination. Please request a new code.');
+      }
+      if (record.attempts >= 5) {
+        throw new Error('Maximum verification attempts exceeded. Please request a new code.');
+      }
+      if (record.code !== submittedCode) {
+        record.attempts = (record.attempts || 0) + 1;
+        activeOtps[target] = record;
+        localStorage.setItem('siri_active_otps', JSON.stringify(activeOtps));
+        const remaining = Math.max(0, 5 - record.attempts);
+        throw new Error(`Incorrect verification code. ${remaining} attempts remaining.`);
+      }
+
+      delete activeOtps[target];
+      if (target.includes('@')) delete activeOtps[target.toLowerCase()];
+      localStorage.setItem('siri_active_otps', JSON.stringify(activeOtps));
+
+      // Update verification in demo storage
+      const users = JSON.parse(localStorage.getItem('siri_users') || '[]');
+      const userIndex = users.findIndex(u => 
+        (body.user_id && u.id === body.user_id) || 
+        (u.phone && u.phone === target) || 
+        (u.email && u.email.toLowerCase() === target.toLowerCase())
+      );
+      if (userIndex !== -1) {
+        if (body.type === 'mobile' || target.replace(/[^0-9]/g, '').length >= 10) {
+          users[userIndex].is_mobile_verified = true;
+        } else {
+          users[userIndex].is_email_verified = true;
+        }
+        localStorage.setItem('siri_users', JSON.stringify(users));
+      }
+
+      return { success: true, message: 'Verified successfully' };
     }
     if (endpoint === '/api/bookings' && method === 'POST') {
       const curUser = this.getCurrentUser();
