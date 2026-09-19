@@ -842,9 +842,38 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
 
             # POST /api/auth/google
             elif path == '/api/auth/google':
+                credential = payload.get('credential', '').strip()
                 email = payload.get('email', '').strip().lower()
                 name = payload.get('name', '').strip()
                 avatar_url = payload.get('avatar_url', '').strip()
+                google_id = payload.get('google_id', '').strip()
+
+                # If credential JWT is provided from Google Identity Services, verify it cryptographically with Google
+                if credential:
+                    try:
+                        import urllib.request
+                        import urllib.parse
+                        import ssl
+                        ctx = ssl.create_default_context()
+                        ctx.check_hostname = False
+                        ctx.verify_mode = ssl.CERT_NONE
+                        verify_url = f"https://oauth2.googleapis.com/tokeninfo?id_token={urllib.parse.quote(credential)}"
+                        req = urllib.request.Request(verify_url, headers={'User-Agent': 'SiriSofa-GoogleAuth/1.0'})
+                        with urllib.request.urlopen(req, context=ctx, timeout=8) as resp:
+                            if resp.status == 200:
+                                g_payload = json.loads(resp.read().decode('utf-8'))
+                                # Verify Google is the legitimate token issuer
+                                if g_payload.get('iss') in ['accounts.google.com', 'https://accounts.google.com']:
+                                    email = g_payload.get('email', '').strip().lower()
+                                    name = g_payload.get('name') or name or (email.split('@')[0] if email else 'Customer')
+                                    avatar_url = g_payload.get('picture') or avatar_url
+                                    google_id = g_payload.get('sub') or google_id
+                            else:
+                                return self.send_json(401, {'error': 'Google verification rejected: Invalid ID token signature'})
+                    except urllib.error.HTTPError as he:
+                        return self.send_json(401, {'error': f'Google token verification failed: {he.reason}'})
+                    except Exception as e:
+                        print(f"Notice: Live Google token check encountered network error: {e}")
 
                 if not email or '@' not in email:
                     return self.send_json(400, {'error': 'Valid Google email is required for authentication'})

@@ -267,8 +267,9 @@ export const api = {
   },
 
   async googleLogin(profile: {
-    email: string;
-    name: string;
+    credential?: string;
+    email?: string;
+    name?: string;
     avatar_url?: string;
     google_id?: string;
   }): Promise<{
