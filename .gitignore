@@ -28,5 +28,11 @@ venv/
 # Local Documentation & Audit Reports (Do NOT upload to GitHub)
 FIXES_AND_CHANGELOG.md
 *FIXES*.md
+
+# Node.js & Next.js
+web/node_modules/
+web/.next/
+web/out/
+
 *REPORT*.md
 
