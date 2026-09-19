@@ -65,7 +65,12 @@ export const api = {
     try {
       const res = await fetchApi("/api/pricing", { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to load pricing");
-      return await res.json();
+      const data = await res.json();
+      const cfg = data.config || data;
+      return {
+        service_charge: Number(cfg.service_charge) || 49,
+        gst_percentage: Number(cfg.gst_percentage) || 18,
+      };
     } catch {
       return { service_charge: 49, gst_percentage: 18 };
     }

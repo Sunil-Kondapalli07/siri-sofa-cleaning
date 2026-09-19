@@ -106,11 +106,12 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Cart calculations
-  const subtotal = cart.reduce((sum, it) => sum + it.variant.base_price * it.quantity, 0);
-  const serviceCharge = cart.length > 0 ? pricingConfig.service_charge : 0;
+  // Cart calculations with robust numeric fallback
+  const subtotal = Math.round(cart.reduce((sum, it) => sum + (Number(it.variant.base_price) || 0) * it.quantity, 0));
+  const serviceCharge = cart.length > 0 ? (Number(pricingConfig?.service_charge) || 49) : 0;
+  const gstRate = Number(pricingConfig?.gst_percentage) || 18;
   const taxable = Math.max(0, subtotal - couponDiscount + serviceCharge);
-  const gst = Math.round(taxable * (pricingConfig.gst_percentage / 100));
+  const gst = Math.round(taxable * (gstRate / 100));
   const total = Math.round(taxable + gst);
 
   const handleApplyCoupon = async () => {

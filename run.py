@@ -16,13 +16,12 @@ from server import run_server
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("🛋️  SIRI SOFA SERVICES — \"Fresh Sofa. Fresh Home.\"")
+    print("🛋️  SIRI SOFA SERVICES — BACKEND REST API SERVER")
     print("=" * 60)
     print("⚡ Initializing SQLite Database & Seed Data...")
     init_db()
-    print("🚀 Starting Web & REST API Server...")
-    print("👉 Open your browser at: http://localhost:8000")
-    print("👉 Admin Portal:  Configured via ADMIN_EMAIL / ADMIN_PASSWORD environment variables")
-    print("👉 New Customers: Instant live signup with real-time OTP verification")
+    print("🚀 Backend REST API Server listening on: http://localhost:8000")
+    print("👉 API Health / Services: http://localhost:8000/api/services")
+    print("👉 Modern React Web UI:   http://localhost:3000 (cd web && npm run dev)")
     print("=" * 60)
     run_server()

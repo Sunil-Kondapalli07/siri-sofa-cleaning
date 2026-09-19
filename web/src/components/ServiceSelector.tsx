@@ -66,9 +66,10 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     0
   );
   const totalItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-  const serviceCharge = totalItemCount > 0 ? pricingConfig.service_charge : 0;
+  const serviceCharge = totalItemCount > 0 ? (Number(pricingConfig?.service_charge) || 49) : 0;
+  const gstRate = Number(pricingConfig?.gst_percentage) || 18;
   const taxable = Math.max(0, subtotal + serviceCharge);
-  const tax = Math.round(taxable * (pricingConfig.gst_percentage / 100));
+  const tax = Math.round(taxable * (gstRate / 100));
   const estimatedTotal = Math.round(taxable + tax);
 
   const getItemQuantity = (variantId: number) => {
