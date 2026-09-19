@@ -109,7 +109,7 @@ export const ShowroomStoryContainer: React.FC<ShowroomStoryContainerProps> = ({
     services.find((s) => s.slug === activeCategory) || services[0];
 
   return (
-    <div ref={containerRef} className="relative h-[650vh] bg-[#090C10]">
+    <div ref={containerRef} className="relative h-[650vh] bg-[#080B0F]">
       {/* Sticky Fullscreen 3D Viewport */}
       <div className="sticky top-0 h-screen w-full overflow-hidden flex flex-col justify-between select-none">
         
@@ -197,7 +197,7 @@ export const ShowroomStoryContainer: React.FC<ShowroomStoryContainerProps> = ({
           </div>
         </div>
 
-        {/* ACT 3: 32% - 46% (The Problem: What Lies Beneath) */}
+        {/* ACT 3: 32% - 46% (The Problem: What Looks Clean... Is It Always Clean?) */}
         <div
           className={`absolute inset-0 flex flex-col justify-center items-end px-8 sm:px-16 lg:px-24 transition-all duration-700 pointer-events-none ${
             smoothProgress >= 0.32 && smoothProgress < 0.46
@@ -211,10 +211,10 @@ export const ShowroomStoryContainer: React.FC<ShowroomStoryContainerProps> = ({
               <span>Microscopic Reality</span>
             </div>
             <h2 className="text-2xl sm:text-4xl font-black text-white leading-tight">
-              What looks clean isn&apos;t always clean.
+              What looks clean... is it always clean?
             </h2>
             <p className="text-xs sm:text-sm text-white/70 leading-relaxed">
-              Natural body sweat, cooking fumes, pet dander, and microscopic dust mites burrow up to 3.5 inches deep into foam cores. Ordinary cloth wiping leaves 90% behind.
+              Natural body sweat, cooking fumes, pet dander, and microscopic dust mites burrow up to 3.5 inches deep into foam cores. Ordinary surface wiping leaves 90% behind.
             </p>
             <div className="pt-2 flex items-center gap-4 text-xs font-mono text-amber-300">
               <span>• 200,000+ Allergen Particles</span>
