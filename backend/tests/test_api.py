@@ -533,5 +533,64 @@ class DirectHandlerTest(unittest.TestCase):
         status, _ = self.invoke_api('GET', '/api/addresses', headers_dict={'Authorization': f'Bearer {temp_token}'})
         self.assertEqual(status, 401)
 
+    def test_12_password_reset_flow(self):
+        # Request password reset for existing customer
+        status, req_res = self.invoke_api('POST', '/api/auth/password/reset-request', {
+            'target': 'sunil@example.com'
+        })
+        self.assertEqual(status, 200)
+        self.assertTrue(req_res['success'])
+        self.assertIn('challenge_id', req_res)
+        challenge_id = req_res['challenge_id']
+        otp_hint = req_res.get('dev_otp_hint')
+
+        # Test reset with invalid code fails
+        status, err_res = self.invoke_api('POST', '/api/auth/password/reset', {
+            'challenge_id': challenge_id,
+            'otp_code': '000000',
+            'new_password': 'newpassword123'
+        })
+        self.assertEqual(status, 400)
+        self.assertIn('Incorrect', err_res['error'])
+
+        # Test reset with valid code succeeds
+        status, ok_res = self.invoke_api('POST', '/api/auth/password/reset', {
+            'challenge_id': challenge_id,
+            'otp_code': otp_hint,
+            'new_password': 'newpassword123'
+        })
+        self.assertEqual(status, 200)
+        self.assertTrue(ok_res['success'])
+
+        # Now login with new password must succeed
+        status, login_res = self.invoke_api('POST', '/api/auth/login', {
+            'email': 'sunil@example.com',
+            'password': 'newpassword123'
+        })
+        self.assertEqual(status, 200)
+        self.assertIn('token', login_res)
+
+    def test_13_google_auth_flow(self):
+        # 1. New Google user sign-in
+        status, g_res = self.invoke_api('POST', '/api/auth/google', {
+            'email': 'google.tester@gmail.com',
+            'name': 'Google Tester'
+        })
+        self.assertEqual(status, 200)
+        self.assertTrue(g_res['success'])
+        self.assertIn('token', g_res)
+        self.assertEqual(g_res['user']['email'], 'google.tester@gmail.com')
+        self.assertTrue(g_res['user']['is_email_verified'])
+
+        # 2. Existing Google user sign-in
+        status, g_res2 = self.invoke_api('POST', '/api/auth/google', {
+            'email': 'google.tester@gmail.com',
+            'name': 'Google Tester Updated'
+        })
+        self.assertEqual(status, 200)
+        self.assertTrue(g_res2['success'])
+        self.assertEqual(g_res2['user']['id'], g_res['user']['id'])
+
 if __name__ == '__main__':
     unittest.main()
+

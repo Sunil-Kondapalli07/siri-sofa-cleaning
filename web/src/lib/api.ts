@@ -233,6 +233,67 @@ export const api = {
     return await res.json();
   },
 
+  async requestPasswordReset(target: string): Promise<{
+    success?: boolean;
+    challenge_id?: string;
+    target?: string;
+    message?: string;
+    dev_otp_hint?: string;
+    error?: string;
+  }> {
+    const res = await fetchApi("/api/auth/password/reset-request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target }),
+    });
+    return await res.json();
+  },
+
+  async resetPassword(challengeId: string, otpCode: string, newPassword: string): Promise<{
+    success?: boolean;
+    message?: string;
+    error?: string;
+  }> {
+    const res = await fetchApi("/api/auth/password/reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        challenge_id: challengeId,
+        otp_code: otpCode,
+        new_password: newPassword,
+      }),
+    });
+    return await res.json();
+  },
+
+  async googleLogin(profile: {
+    email: string;
+    name: string;
+    avatar_url?: string;
+    google_id?: string;
+  }): Promise<{
+    success?: boolean;
+    user?: User;
+    token?: string;
+    error?: string;
+  }> {
+    const res = await fetchApi("/api/auth/google", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(profile),
+    });
+    const data = await res.json();
+    if (data.token && data.user) {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("siri_auth_token", data.token);
+        localStorage.setItem("siri_token", data.token);
+        localStorage.setItem("siri_user_profile", JSON.stringify(data.user));
+        localStorage.setItem("siri_user", JSON.stringify(data.user));
+      }
+    }
+    return data;
+  },
+
   async logout() {
     try {
       await fetchApi("/api/auth/logout", {
@@ -248,3 +309,4 @@ export const api = {
     }
   },
 };
+

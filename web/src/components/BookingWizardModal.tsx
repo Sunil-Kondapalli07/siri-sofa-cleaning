@@ -130,24 +130,94 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     }
   };
 
+  // Validation errors
+  const [contactErrors, setContactErrors] = useState<Record<string, string>>({});
+  const [addressErrors, setAddressErrors] = useState<Record<string, string>>({});
+
+  const validateStep2 = (): boolean => {
+    const errs: Record<string, string> = {};
+    if (!name.trim()) {
+      errs.name = "Please enter your full name.";
+    } else if (name.trim().length < 2) {
+      errs.name = "Name must be at least 2 characters.";
+    }
+
+    const cleanPhone = phone.replace(/\+91|\s|-/g, "");
+    if (!cleanPhone) {
+      errs.phone = "Mobile number is required.";
+    } else if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+      errs.phone = "Please enter a valid 10-digit Indian mobile number (e.g. 98480 99887).";
+    }
+
+    if (!email.trim()) {
+      errs.email = "Email address is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      errs.email = "Please enter a valid email address.";
+    }
+
+    if (password && password.length < 6) {
+      errs.password = "Password must be at least 6 characters.";
+    }
+
+    setContactErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
   const handleStep2Continue = async () => {
     setSubmitError("");
+    if (!validateStep2()) return;
+
     // If not logged in but provided password, attempt instant registration or login
     if (!user && password.length >= 6 && email && name && phone) {
       try {
+        const cleanPhone = phone.replace(/\+91|\s|-/g, "");
         const regRes = await api.register({
           name: name.trim(),
-          phone: phone.trim(),
+          phone: cleanPhone,
           email: email.trim().toLowerCase(),
           password,
         });
-        if (regRes.token) {
-          // Success
+        if (regRes.error && regRes.error.toLowerCase().includes("already exists")) {
+          setContactErrors({
+            email: "An account already exists with this email or mobile. Please sign in to link your booking.",
+          });
+          return;
         }
       } catch {}
     }
     setStep(3);
   };
+
+  const validateStep3 = (): boolean => {
+    const errs: Record<string, string> = {};
+    if (!houseFlat.trim()) {
+      errs.houseFlat = "House / Flat number is required.";
+    } else if (houseFlat.trim().length < 2) {
+      errs.houseFlat = "Please enter complete house/flat details.";
+    }
+
+    if (!street.trim()) {
+      errs.street = "Street / Landmark is required.";
+    } else if (street.trim().length < 3) {
+      errs.street = "Please enter valid street or landmark.";
+    }
+
+    const cleanPin = pincode.trim();
+    if (!cleanPin) {
+      errs.pincode = "Pincode is required.";
+    } else if (!/^\d{6}$/.test(cleanPin)) {
+      errs.pincode = "Pincode must be exactly 6 digits (e.g. 500034).";
+    }
+
+    setAddressErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleStep3Continue = () => {
+    if (!validateStep3()) return;
+    setStep(4);
+  };
+
 
   const handleSubmitBooking = async () => {
     if (isSubmitting) return;
@@ -493,11 +563,19 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                     <input
                       type="text"
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        if (contactErrors.name) setContactErrors(prev => ({ ...prev, name: "" }));
+                      }}
                       placeholder="e.g. Ramesh Reddy"
-                      className="w-full px-4 py-3 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34]"
+                      className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none transition-colors ${
+                        contactErrors.name ? "border-red-400 bg-red-50/20 focus:border-red-500" : "border-black/15 focus:border-[#0C4A34]"
+                      }`}
                       required
                     />
+                    {contactErrors.name && (
+                      <p className="text-[11px] text-red-600 font-medium mt-1">{contactErrors.name}</p>
+                    )}
                   </div>
 
                   <div>
@@ -507,11 +585,19 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                     <input
                       type="tel"
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
+                      onChange={(e) => {
+                        setPhone(e.target.value);
+                        if (contactErrors.phone) setContactErrors(prev => ({ ...prev, phone: "" }));
+                      }}
                       placeholder="e.g. 98480 99887"
-                      className="w-full px-4 py-3 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34]"
+                      className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none transition-colors ${
+                        contactErrors.phone ? "border-red-400 bg-red-50/20 focus:border-red-500" : "border-black/15 focus:border-[#0C4A34]"
+                      }`}
                       required
                     />
+                    {contactErrors.phone && (
+                      <p className="text-[11px] text-red-600 font-medium mt-1">{contactErrors.phone}</p>
+                    )}
                   </div>
 
                   <div>
@@ -521,11 +607,19 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                     <input
                       type="email"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (contactErrors.email) setContactErrors(prev => ({ ...prev, email: "" }));
+                      }}
                       placeholder="e.g. ramesh@example.com"
-                      className="w-full px-4 py-3 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34]"
+                      className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none transition-colors ${
+                        contactErrors.email ? "border-red-400 bg-red-50/20 focus:border-red-500" : "border-black/15 focus:border-[#0C4A34]"
+                      }`}
                       required
                     />
+                    {contactErrors.email && (
+                      <p className="text-[11px] text-red-600 font-medium mt-1">{contactErrors.email}</p>
+                    )}
                   </div>
 
                   {!user && (
@@ -536,10 +630,18 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                       <input
                         type="password"
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          if (contactErrors.password) setContactErrors(prev => ({ ...prev, password: "" }));
+                        }}
                         placeholder="••••••••"
-                        className="w-full px-4 py-3 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34]"
+                        className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none transition-colors ${
+                          contactErrors.password ? "border-red-400 bg-red-50/20 focus:border-red-500" : "border-black/15 focus:border-[#0C4A34]"
+                        }`}
                       />
+                      {contactErrors.password && (
+                        <p className="text-[11px] text-red-600 font-medium mt-1">{contactErrors.password}</p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -556,11 +658,19 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                       <input
                         type="text"
                         value={houseFlat}
-                        onChange={(e) => setHouseFlat(e.target.value)}
+                        onChange={(e) => {
+                          setHouseFlat(e.target.value);
+                          if (addressErrors.houseFlat) setAddressErrors(prev => ({ ...prev, houseFlat: "" }));
+                        }}
                         placeholder="e.g. Flat 402, Luxury Heights"
-                        className="w-full px-4 py-3 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34]"
+                        className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none transition-colors ${
+                          addressErrors.houseFlat ? "border-red-400 bg-red-50/20 focus:border-red-500" : "border-black/15 focus:border-[#0C4A34]"
+                        }`}
                         required
                       />
+                      {addressErrors.houseFlat && (
+                        <p className="text-[11px] text-red-600 font-medium mt-1">{addressErrors.houseFlat}</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-[#121820] mb-1.5">
@@ -569,11 +679,19 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                       <input
                         type="text"
                         value={street}
-                        onChange={(e) => setStreet(e.target.value)}
+                        onChange={(e) => {
+                          setStreet(e.target.value);
+                          if (addressErrors.street) setAddressErrors(prev => ({ ...prev, street: "" }));
+                        }}
                         placeholder="e.g. Road No. 12, Near Park"
-                        className="w-full px-4 py-3 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34]"
+                        className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none transition-colors ${
+                          addressErrors.street ? "border-red-400 bg-red-50/20 focus:border-red-500" : "border-black/15 focus:border-[#0C4A34]"
+                        }`}
                         required
                       />
+                      {addressErrors.street && (
+                        <p className="text-[11px] text-red-600 font-medium mt-1">{addressErrors.street}</p>
+                      )}
                     </div>
                   </div>
 
@@ -606,12 +724,21 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                       </label>
                       <input
                         type="text"
+                        maxLength={6}
                         value={pincode}
-                        onChange={(e) => setPincode(e.target.value)}
+                        onChange={(e) => {
+                          setPincode(e.target.value);
+                          if (addressErrors.pincode) setAddressErrors(prev => ({ ...prev, pincode: "" }));
+                        }}
                         placeholder="500034"
-                        className="w-full px-4 py-3 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34]"
+                        className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none transition-colors ${
+                          addressErrors.pincode ? "border-red-400 bg-red-50/20 focus:border-red-500" : "border-black/15 focus:border-[#0C4A34]"
+                        }`}
                         required
                       />
+                      {addressErrors.pincode && (
+                        <p className="text-[11px] text-red-600 font-medium mt-1">{addressErrors.pincode}</p>
+                      )}
                     </div>
                   </div>
 
@@ -848,9 +975,8 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
 
             {step === 3 && (
               <button
-                onClick={() => setStep(4)}
-                disabled={!houseFlat || !street || !pincode}
-                className="btn-primary text-xs py-2.5 px-6 disabled:opacity-40"
+                onClick={handleStep3Continue}
+                className="btn-primary text-xs py-2.5 px-6"
               >
                 <span>Continue to Slot</span>
                 <ArrowRight className="w-3.5 h-3.5" />

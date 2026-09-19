@@ -482,14 +482,24 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 cursor = conn.cursor()
                 cursor.execute("SELECT id FROM users WHERE LOWER(email) = ?", (email,))
                 if cursor.fetchone():
-                    return self.send_json(400, {'error': 'User already exists with this email address. Please sign in instead.', 'field': 'email'})
+                    return self.send_json(400, {
+                        'error': 'User already exists. Please sign in.',
+                        'user_exists': True,
+                        'field': 'email',
+                        'target': email
+                    })
 
                 if phone:
                     clean_phone = phone.replace('+91', '').replace(' ', '').replace('-', '').strip()
                     if len(clean_phone) >= 10:
                         cursor.execute("SELECT id FROM users WHERE REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+91', '') LIKE ?", (f"%{clean_phone[-10:]}",))
                         if cursor.fetchone():
-                            return self.send_json(400, {'error': 'User already exists with this mobile number. Please sign in instead.', 'field': 'phone'})
+                            return self.send_json(400, {
+                                'error': 'User already exists with this mobile number. Please sign in.',
+                                'user_exists': True,
+                                'field': 'phone',
+                                'target': phone
+                            })
 
                 pw_hash = hash_password(password)
                 cursor.execute("""
@@ -708,6 +718,177 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     'message': f"{v_type.capitalize()} verified successfully!",
                     'target': v_target,
                     'type': v_type
+                })
+
+            # POST /api/auth/password/reset-request
+            elif path == '/api/auth/password/reset-request':
+                target = payload.get('target', '').strip()
+                if not target:
+                    return self.send_json(400, {'error': 'Please enter your registered email address or mobile number.'})
+
+                # Rate limiting: max 5 reset requests per 15 mins per IP + target
+                reset_key = f"reset_req:{ip_addr}:{target}"
+                allowed, retry_sec = limiter.check(reset_key, max_requests=5, window_seconds=900)
+                if not allowed:
+                    return self.send_json(429, {'error': f'Too many reset requests. Please wait {retry_sec} seconds before trying again.'})
+
+                cursor = conn.cursor()
+                user = None
+                target_type = 'email'
+                clean_target = target
+
+                if '@' in target:
+                    clean_target = target.lower().strip()
+                    cursor.execute("SELECT * FROM users WHERE LOWER(email) = ?", (clean_target,))
+                    user = cursor.fetchone()
+                    target_type = 'email'
+                else:
+                    digits = target.replace('+91', '').replace(' ', '').replace('-', '').strip()
+                    if len(digits) >= 10:
+                        clean_digits = digits[-10:]
+                        cursor.execute("""
+                            SELECT * FROM users 
+                            WHERE REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+91', '') LIKE ?
+                        """, (f"%{clean_digits}",))
+                        user = cursor.fetchone()
+                    target_type = 'mobile'
+
+                if not user:
+                    return self.send_json(404, {'error': 'No account found with this email or mobile number. Please check or sign up.'})
+
+                dest = user['email'] if target_type == 'email' else (user['phone'] or target)
+                otp_code = generate_secure_otp()
+                challenge_id = secrets.token_hex(16)
+                otp_h = hash_otp(otp_code, challenge_id)
+                expires_at = (datetime.now() + timedelta(minutes=15)).isoformat()
+
+                cursor.execute("""
+                    INSERT INTO verification_otps (challenge_id, target, target_type, otp_hash, otp_code, expires_at, attempts, is_used, created_at, user_id)
+                    VALUES (?, ?, ?, ?, 'HASHED', ?, 0, 0, ?, ?)
+                """, (challenge_id, dest, target_type, otp_h, expires_at, now, user['id']))
+
+                dispatch_res = dispatch_verification_code(dest, target_type, otp_code, user['name'])
+                status_str = 'delivered' if dispatch_res['delivered'] else 'simulated_logged'
+                cursor.execute("""
+                    INSERT INTO notifications_log (recipient, channel, message, status, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (dest, target_type, f"Password reset verification code dispatched. Status: {status_str}", status_str, now))
+                conn.commit()
+
+                return self.send_json(200, {
+                    'success': True,
+                    'challenge_id': challenge_id,
+                    'target': dest,
+                    'target_type': target_type,
+                    'user_id': user['id'],
+                    'message': f'A 6-digit password reset code has been sent to {dest}',
+                    'dev_otp_hint': otp_code if not dispatch_res['delivered'] else None
+                })
+
+            # POST /api/auth/password/reset
+            elif path == '/api/auth/password/reset':
+                challenge_id = payload.get('challenge_id', '').strip()
+                otp_code = (payload.get('otp_code') or payload.get('otp') or '').strip()
+                new_password = payload.get('new_password', '')
+
+                if not challenge_id:
+                    return self.send_json(400, {'error': 'Challenge session expired or missing. Please request a new reset code.'})
+                if not otp_code:
+                    return self.send_json(400, {'error': 'Please enter the 6-digit verification code.'})
+                if len(new_password) < 6:
+                    return self.send_json(400, {'error': 'New password must be at least 6 characters long.'})
+
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT * FROM verification_otps 
+                    WHERE challenge_id = ? AND is_used = 0 
+                    ORDER BY id DESC LIMIT 1
+                """, (challenge_id,))
+                record = cursor.fetchone()
+
+                if not record:
+                    return self.send_json(400, {'error': 'Reset request not found or code already used. Please request a new code.'})
+
+                if record['expires_at'] < now:
+                    return self.send_json(400, {'error': 'Reset code has expired. Please request a new code.'})
+
+                if record['attempts'] >= 5:
+                    return self.send_json(400, {'error': 'Maximum verification attempts exceeded. Please request a new code.'})
+
+                is_valid = False
+                if record['otp_hash']:
+                    is_valid = verify_otp_hash(otp_code, challenge_id, record['otp_hash'])
+                elif record['otp_code'] and record['otp_code'] != 'HASHED':
+                    is_valid = hmac.compare_digest(record['otp_code'], otp_code)
+
+                if not is_valid:
+                    cursor.execute("UPDATE verification_otps SET attempts = attempts + 1 WHERE id = ?", (record['id'],))
+                    conn.commit()
+                    remaining = 4 - record['attempts']
+                    return self.send_json(400, {'error': f'Incorrect verification code. {max(0, remaining)} attempts remaining.'})
+
+                # Valid: mark OTP used, update password, and terminate existing sessions
+                cursor.execute("UPDATE verification_otps SET is_used = 1 WHERE id = ?", (record['id'],))
+                user_id = record['user_id']
+                pw_hash = hash_password(new_password)
+                cursor.execute("UPDATE users SET password_hash = ? WHERE id = ?", (pw_hash, user_id))
+                cursor.execute("DELETE FROM user_sessions WHERE user_id = ?", (user_id,))
+                conn.commit()
+
+                return self.send_json(200, {
+                    'success': True,
+                    'message': 'Password has been reset successfully! Please sign in with your new password.'
+                })
+
+            # POST /api/auth/google
+            elif path == '/api/auth/google':
+                email = payload.get('email', '').strip().lower()
+                name = payload.get('name', '').strip()
+                avatar_url = payload.get('avatar_url', '').strip()
+
+                if not email or '@' not in email:
+                    return self.send_json(400, {'error': 'Valid Google email is required for authentication'})
+
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM users WHERE LOWER(email) = ?", (email,))
+                user = cursor.fetchone()
+
+                if not user:
+                    # Auto-provision user with verified email
+                    display_name = name or email.split('@')[0].replace('.', ' ').title()
+                    random_pw = secrets.token_urlsafe(32)
+                    pw_hash = hash_password(random_pw)
+                    cursor.execute("""
+                        INSERT INTO users (name, email, phone, password_hash, role, is_email_verified, is_mobile_verified, created_at)
+                        VALUES (?, ?, '', ?, 'customer', 1, 0, ?)
+                    """, (display_name, email, pw_hash, now))
+                    conn.commit()
+                    user_id = cursor.lastrowid
+                    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+                    user = cursor.fetchone()
+                else:
+                    user_id = user['id']
+                    if not user['is_email_verified']:
+                        cursor.execute("UPDATE users SET is_email_verified = 1 WHERE id = ?", (user_id,))
+                        conn.commit()
+
+                token = create_user_session(conn, user_id, user['role'], ip_addr, user_agent)
+                u_dict = {
+                    'id': user['id'],
+                    'name': user['name'],
+                    'email': user['email'],
+                    'phone': user['phone'],
+                    'role': user['role'],
+                    'avatar_url': avatar_url or None,
+                    'is_email_verified': True,
+                    'is_mobile_verified': bool(user['is_mobile_verified']) if 'is_mobile_verified' in user.keys() else False
+                }
+
+                return self.send_json(200, {
+                    'success': True,
+                    'user': u_dict,
+                    'token': token,
+                    'message': f'Signed in as {u_dict["name"]} with Google'
                 })
 
             # POST /api/coupons/validate
