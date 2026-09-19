@@ -5,7 +5,8 @@ import { Service, ServiceVariant, CartItem, User } from "@/types";
 import { api } from "@/lib/api";
 import { ScrollProgress } from "@/components/ScrollProgress";
 import { Navbar } from "@/components/Navbar";
-import { ShowroomStoryContainer } from "@/components/showroom/ShowroomStoryContainer";
+import { CinematicBrandFilm } from "@/components/film/CinematicBrandFilm";
+import { ServicesShowcase } from "@/components/film/ServicesShowcase";
 import { HygieneProcess } from "@/components/HygieneProcess";
 import { ReviewsFaq } from "@/components/ReviewsFaq";
 import { Footer } from "@/components/Footer";
@@ -96,22 +97,27 @@ export default function Home() {
         onLogout={handleLogout}
       />
 
-      {/* Continuous 3D Digital Showroom & Brand Film Experience */}
+      {/* Main Experience Flow */}
       <main className="flex-1">
-        <ShowroomStoryContainer
+        {/* 1. Photorealistic 7-Act Cinematic Brand Film */}
+        <CinematicBrandFilm
+          onOpenBooking={() => setIsBookingOpen(true)}
+          onOpenTracking={() => setIsTrackerOpen(true)}
+        />
+
+        {/* 2. Interactive Backend-Driven Service Catalog & Customizer */}
+        <ServicesShowcase
           services={services}
           cart={cart}
           pricingConfig={pricingConfig}
           onUpdateQuantity={handleUpdateQuantity}
-          onOpenBooking={() => setIsBookingOpen(true)}
-          onOpenTracking={() => setIsTrackerOpen(true)}
-          user={user}
+          onProceedToBooking={() => setIsBookingOpen(true)}
         />
 
-        {/* Clinical Proof Protocol */}
+        {/* 3. Standardized 6-Step Professional Process */}
         <HygieneProcess />
 
-        {/* Verified Hyderabad Customer Reviews & Accordion FAQs */}
+        {/* 4. Verified Customer Reviews & FAQs */}
         <ReviewsFaq />
       </main>
 
