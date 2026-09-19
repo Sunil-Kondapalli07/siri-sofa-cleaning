@@ -7,10 +7,12 @@ import urllib.parse
 import sqlite3
 import random
 import string
+import secrets
+import hmac
 from datetime import datetime, date, timedelta
 
-from database import get_connection, hash_password, DB_PATH, init_db
-from notifications import dispatch_verification_code, load_dotenv
+from database import get_connection, hash_password, verify_password, hash_otp, verify_otp_hash, DB_PATH, init_db
+from notifications import dispatch_verification_code, generate_secure_otp, load_dotenv
 
 # Load .env variables
 load_dotenv()
@@ -22,13 +24,55 @@ FRONTEND_DIR = os.path.join(BASE_DIR, 'frontend')
 # Ensure DB is initialized
 init_db(DB_PATH)
 
-def generate_booking_id() -> str:
-    nums = ''.join(random.choices(string.digits, k=6))
-    return f"SIRI-{nums}"
+def generate_booking_id(conn = None) -> str:
+    """Generate cryptographically random booking ID with collision retry"""
+    for _ in range(10):
+        nums = ''.join(secrets.choice(string.digits) for _ in range(6))
+        candidate = f"SIRI-{nums}"
+        if conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1 FROM bookings WHERE id = ?", (candidate,))
+            if not cursor.fetchone():
+                return candidate
+        else:
+            return candidate
+    return f"SIRI-{secrets.token_hex(4).upper()}"
+
+def create_user_session(conn, user_id: int, role: str, ip_address: str = None, user_agent: str = None) -> str:
+    """Issue a high-entropy cryptographic session token stored server-side with expiration"""
+    session_token = secrets.token_urlsafe(32)
+    created_at = datetime.now().isoformat()
+    expires_at = (datetime.now() + timedelta(days=7)).isoformat()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO user_sessions (session_token, user_id, role, created_at, expires_at, ip_address, user_agent)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (session_token, user_id, role, created_at, expires_at, ip_address, user_agent))
+    conn.commit()
+    return session_token
+
+def delete_user_session(conn, session_token: str):
+    """Revoke user session immediately upon logout"""
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM user_sessions WHERE session_token = ?", (session_token,))
+    conn.commit()
 
 class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
-        self.send_header('Access-Control-Allow-Origin', '*')
+        origin = self.headers.get('Origin', '')
+        allowed_origins_env = os.environ.get('CORS_ORIGINS', '').strip()
+        if allowed_origins_env:
+            allowed_list = [o.strip() for o in allowed_origins_env.split(',') if o.strip()]
+            if origin in allowed_list:
+                self.send_header('Access-Control-Allow-Origin', origin)
+                self.send_header('Vary', 'Origin')
+            else:
+                self.send_header('Access-Control-Allow-Origin', allowed_list[0])
+        else:
+            # Development permissive CORS
+            self.send_header('Access-Control-Allow-Origin', origin or '*')
+            if origin:
+                self.send_header('Vary', 'Origin')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
         super().end_headers()
@@ -60,17 +104,26 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
         if not auth_header.startswith('Bearer '):
             return None
         token = auth_header[7:].strip()
-        parts = token.split('_')
-        if len(parts) < 3 or parts[0] != 'token':
+        if not token:
             return None
-        try:
-            user_id = int(parts[1])
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, name, email, phone, role FROM users WHERE id = ?", (user_id,))
-            row = cursor.fetchone()
-            return dict(row) if row else None
-        except Exception:
-            return None
+
+        cursor = conn.cursor()
+        now_iso = datetime.now().isoformat()
+
+        # 1. Look up cryptographic session token
+        cursor.execute("""
+            SELECT s.user_id, s.role, u.name, u.email, u.phone, u.is_email_verified, u.is_mobile_verified
+            FROM user_sessions s
+            JOIN users u ON s.user_id = u.id
+            WHERE s.session_token = ? AND s.expires_at > ?
+        """, (token, now_iso))
+        row = cursor.fetchone()
+        if row:
+            res = dict(row)
+            res['id'] = res['user_id']
+            return res
+
+        return None
 
     def require_admin(self, conn):
         user = self.get_authenticated_user(conn)
@@ -152,8 +205,12 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
     def handle_api_get(self, path: str, query: dict):
         conn = get_connection()
         try:
+            # GET /api/health
+            if path == '/api/health':
+                return self.send_json(200, {'status': 'healthy', 'service': 'Siri Sofa Services'})
+
             # GET /api/services
-            if path == '/api/services':
+            elif path == '/api/services':
                 cursor = conn.cursor()
                 cursor.execute("SELECT * FROM services WHERE is_active = 1 ORDER BY id ASC")
                 services = [dict(row) for row in cursor.fetchall()]
@@ -207,17 +264,18 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
             # GET /api/bookings or /api/bookings/<id>
             elif path == '/api/bookings':
                 caller = self.get_authenticated_user(conn)
+                if not caller:
+                    return self.send_json(401, {'error': 'Authentication required to view bookings'})
+
                 user_id = query.get('user_id', [None])[0]
                 status_filter = query.get('status', [None])[0]
 
                 # Security & RBAC:
                 # If caller is logged in as customer, lock user_id to their own ID so they cannot view others
-                if caller and caller.get('role') == 'customer':
+                if caller.get('role') == 'customer':
                     user_id = str(caller['id'])
-                elif not caller:
-                    # If unauthenticated, cannot view all bookings across the business
-                    if not user_id:
-                        return self.send_json(401, {'error': 'Authentication required to view bookings'})
+                elif caller.get('role') != 'admin':
+                    return self.send_json(403, {'error': 'Access denied'})
 
                 cursor = conn.cursor()
                 query_str = "SELECT b.*, t.name as technician_name, t.phone as technician_phone FROM bookings b LEFT JOIN technicians t ON b.technician_id = t.id"
@@ -354,13 +412,20 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 reviews = [dict(r) for r in cursor.fetchall()]
                 return self.send_json(200, {'reviews': reviews})
 
-            # GET /api/addresses?user_id=X
+            # GET /api/addresses (IDOR Protected)
             elif path == '/api/addresses':
-                user_id = query.get('user_id', [None])[0]
-                if not user_id:
-                    return self.send_json(400, {'error': 'user_id required'})
+                caller = self.get_authenticated_user(conn)
+                if not caller:
+                    return self.send_json(401, {'error': 'Authentication required to view saved addresses'})
+
+                target_user_id = caller['id']
+                if caller.get('role') == 'admin':
+                    requested_id = query.get('user_id', [None])[0]
+                    if requested_id:
+                        target_user_id = requested_id
+
                 cursor = conn.cursor()
-                cursor.execute("SELECT * FROM addresses WHERE user_id = ? ORDER BY is_default DESC, id ASC", (user_id,))
+                cursor.execute("SELECT * FROM addresses WHERE user_id = ? ORDER BY is_default DESC, id ASC", (target_user_id,))
                 addresses = [dict(a) for a in cursor.fetchall()]
                 return self.send_json(200, {'addresses': addresses})
 
@@ -373,6 +438,10 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
         conn = get_connection()
         payload = self.read_json_body()
         now = datetime.now().isoformat()
+        client_addr = getattr(self, 'client_address', None)
+        ip_addr = client_addr[0] if (client_addr and isinstance(client_addr, (tuple, list))) else None
+        headers = getattr(self, 'headers', {}) or {}
+        user_agent = headers.get('User-Agent', '') if hasattr(headers, 'get') else ''
 
         try:
             # POST /api/auth/login
@@ -382,8 +451,10 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 cursor = conn.cursor()
                 cursor.execute("SELECT * FROM users WHERE LOWER(email) = ?", (email,))
                 user = cursor.fetchone()
-                if not user or user['password_hash'] != hash_password(password):
+                if not user or not verify_password(password, user['password_hash']):
                     return self.send_json(401, {'error': 'Invalid email or password'})
+
+                token = create_user_session(conn, user['id'], user['role'], ip_addr, user_agent)
 
                 u_dict = {
                     'id': user['id'],
@@ -394,7 +465,15 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     'is_email_verified': bool(user['is_email_verified']) if 'is_email_verified' in user.keys() else False,
                     'is_mobile_verified': bool(user['is_mobile_verified']) if 'is_mobile_verified' in user.keys() else False
                 }
-                return self.send_json(200, {'user': u_dict, 'token': f"token_{user['id']}_{int(datetime.now().timestamp())}"})
+                return self.send_json(200, {'user': u_dict, 'token': token})
+
+            # POST /api/auth/logout
+            elif path == '/api/auth/logout':
+                auth_header = self.headers.get('Authorization', '')
+                if auth_header.startswith('Bearer '):
+                    token = auth_header.replace('Bearer ', '').strip()
+                    delete_user_session(conn, token)
+                return self.send_json(200, {'success': True, 'message': 'Logged out successfully'})
 
             # POST /api/auth/register
             elif path == '/api/auth/register':
@@ -405,6 +484,9 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
 
                 if not name or not email or not password:
                     return self.send_json(400, {'error': 'Name, email and password are required'})
+
+                if len(password) < 6:
+                    return self.send_json(400, {'error': 'Password must be at least 6 characters long'})
 
                 cursor = conn.cursor()
                 cursor.execute("SELECT id FROM users WHERE LOWER(email) = ?", (email,))
@@ -426,32 +508,41 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 conn.commit()
                 new_id = cursor.lastrowid
 
+                token = create_user_session(conn, new_id, 'customer', ip_addr, user_agent)
                 expires_at = (datetime.now() + timedelta(minutes=10)).isoformat()
 
+                m_challenge = None
+                m_delivered = False
                 # Dispatch Mobile OTP
                 if phone:
-                    m_code = f"{random.randint(100000, 999999)}"
+                    m_code = generate_secure_otp()
+                    m_challenge = secrets.token_hex(16)
+                    m_hash = hash_otp(m_code)
                     cursor.execute("""
-                        INSERT INTO verification_otps (target, target_type, otp_code, expires_at, attempts, is_used, created_at)
-                        VALUES (?, 'mobile', ?, ?, 0, 0, ?)
-                    """, (phone, m_code, expires_at, now))
+                        INSERT INTO verification_otps (challenge_id, target, target_type, otp_hash, otp_code, expires_at, attempts, is_used, created_at, user_id)
+                        VALUES (?, ?, 'mobile', ?, NULL, ?, 0, 0, ?, ?)
+                    """, (m_challenge, phone, m_hash, expires_at, now, new_id))
                     m_res = dispatch_verification_code(phone, 'mobile', m_code, name)
+                    m_delivered = m_res['delivered']
                     cursor.execute("""
                         INSERT INTO notifications_log (recipient, channel, message, status, created_at)
                         VALUES (?, 'mobile', ?, ?, ?)
-                    """, (phone, f"Your Siri Sofa Services verification code is {m_code}", 'delivered' if m_res['delivered'] else 'simulated_logged', now))
+                    """, (phone, f"Your Siri Sofa Services verification code is {m_code}", 'delivered' if m_delivered else 'simulated_logged', now))
 
                 # Dispatch Email OTP
-                e_code = f"{random.randint(100000, 999999)}"
+                e_code = generate_secure_otp()
+                e_challenge = secrets.token_hex(16)
+                e_hash = hash_otp(e_code)
                 cursor.execute("""
-                    INSERT INTO verification_otps (target, target_type, otp_code, expires_at, attempts, is_used, created_at)
-                    VALUES (?, 'email', ?, ?, 0, 0, ?)
-                """, (email, e_code, expires_at, now))
+                    INSERT INTO verification_otps (challenge_id, target, target_type, otp_hash, otp_code, expires_at, attempts, is_used, created_at, user_id)
+                    VALUES (?, ?, 'email', ?, NULL, ?, 0, 0, ?, ?)
+                """, (e_challenge, email, e_hash, expires_at, now, new_id))
                 e_res = dispatch_verification_code(email, 'email', e_code, name)
+                e_delivered = e_res['delivered']
                 cursor.execute("""
                     INSERT INTO notifications_log (recipient, channel, message, status, created_at)
                     VALUES (?, 'email', ?, ?, ?)
-                """, (email, f"Your Siri Sofa Services verification code is {e_code}", 'delivered' if e_res['delivered'] else 'simulated_logged', now))
+                """, (email, f"Your Siri Sofa Services verification code is {e_code}", 'delivered' if e_delivered else 'simulated_logged', now))
 
                 conn.commit()
 
@@ -464,16 +555,17 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     'is_email_verified': False,
                     'is_mobile_verified': False
                 }
+                # Production security: never return plaintext OTPs in API response
                 return self.send_json(201, {
                     'success': True,
                     'user': u_dict,
-                    'token': f"token_{new_id}_{int(datetime.now().timestamp())}",
+                    'token': token,
                     'requires_verification': True,
-                    'mobile_delivered': m_res['delivered'] if phone else False,
-                    'email_delivered': e_res['delivered'],
-                    'dev_mobile_code': m_code if phone and not m_res['delivered'] else None,
-                    'dev_email_code': e_code if not e_res['delivered'] else None,
-                    'message': 'Account created! Verification codes sent to both your mobile and email.'
+                    'mobile_delivered': m_delivered,
+                    'email_delivered': e_delivered,
+                    'mobile_challenge_id': m_challenge,
+                    'email_challenge_id': e_challenge,
+                    'message': 'Account created! Verification codes sent to your mobile and email.'
                 })
 
             # POST /api/auth/otp/send
@@ -505,14 +597,16 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     except Exception:
                         pass
 
-                # Generate secure 6-digit OTP
-                otp_code = f"{random.randint(100000, 999999)}"
+                # Generate secure 6-digit OTP and challenge ID
+                otp_code = generate_secure_otp()
+                challenge_id = secrets.token_hex(16)
+                otp_h = hash_otp(otp_code)
                 expires_at = (datetime.now() + timedelta(minutes=10)).isoformat()
 
                 cursor.execute("""
-                    INSERT INTO verification_otps (target, target_type, otp_code, expires_at, attempts, is_used, created_at)
-                    VALUES (?, ?, ?, ?, 0, 0, ?)
-                """, (target, otp_type, otp_code, expires_at, now))
+                    INSERT INTO verification_otps (challenge_id, target, target_type, otp_hash, otp_code, expires_at, attempts, is_used, created_at, user_id)
+                    VALUES (?, ?, ?, ?, NULL, ?, 0, 0, ?, ?)
+                """, (challenge_id, target, otp_type, otp_h, expires_at, now, user_id))
 
                 # Real notification dispatch (SMTP or SMS gateway)
                 dispatch_res = dispatch_verification_code(target, otp_type, otp_code, user_name)
@@ -525,37 +619,48 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 """, (target, otp_type, msg_body, status_str, now))
                 conn.commit()
 
+                # Security: never return otp_code in payload
                 return self.send_json(200, {
                     'success': True,
+                    'challenge_id': challenge_id,
                     'message': f"6-digit verification code sent to {target}",
                     'target': target,
                     'type': otp_type,
                     'delivered': dispatch_res['delivered'],
                     'provider': dispatch_res['provider'],
-                    'dev_code': otp_code if not dispatch_res['delivered'] else None,
                     'expires_in_minutes': 10
                 })
 
             # POST /api/auth/otp/verify
             elif path == '/api/auth/otp/verify':
+                challenge_id = payload.get('challenge_id')
                 target = payload.get('target', '').strip()
                 otp_type = payload.get('type', 'mobile').strip().lower()
                 otp_code = payload.get('otp_code', '').strip()
                 user_id = payload.get('user_id')
 
-                if not target or not otp_code:
-                    return self.send_json(400, {'error': 'Target and 6-digit verification code are required'})
+                if not otp_code:
+                    return self.send_json(400, {'error': '6-digit verification code is required'})
 
                 cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT * FROM verification_otps 
-                    WHERE target = ? AND target_type = ? AND is_used = 0 
-                    ORDER BY id DESC LIMIT 1
-                """, (target, otp_type))
+                if challenge_id:
+                    cursor.execute("""
+                        SELECT * FROM verification_otps 
+                        WHERE challenge_id = ? AND is_used = 0 
+                        ORDER BY id DESC LIMIT 1
+                    """, (challenge_id,))
+                else:
+                    if not target:
+                        return self.send_json(400, {'error': 'Challenge ID or Target is required'})
+                    cursor.execute("""
+                        SELECT * FROM verification_otps 
+                        WHERE target = ? AND target_type = ? AND is_used = 0 
+                        ORDER BY id DESC LIMIT 1
+                    """, (target, otp_type))
                 record = cursor.fetchone()
 
                 if not record:
-                    return self.send_json(400, {'error': 'No active verification code found. Please request a new code.'})
+                    return self.send_json(400, {'error': 'No active verification request found. Please request a new code.'})
 
                 if record['expires_at'] < now:
                     return self.send_json(400, {'error': 'Verification code has expired. Please request a new code.'})
@@ -563,7 +668,13 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 if record['attempts'] >= 5:
                     return self.send_json(400, {'error': 'Maximum verification attempts exceeded. Please request a new code.'})
 
-                if record['otp_code'] != otp_code:
+                is_valid = False
+                if record['otp_hash']:
+                    is_valid = verify_otp_hash(otp_code, record['otp_hash'])
+                elif record['otp_code']:
+                    is_valid = hmac.compare_digest(record['otp_code'], otp_code)
+
+                if not is_valid:
                     cursor.execute("UPDATE verification_otps SET attempts = attempts + 1 WHERE id = ?", (record['id'],))
                     conn.commit()
                     remaining = 4 - record['attempts']
@@ -572,24 +683,29 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 # Successful verification
                 cursor.execute("UPDATE verification_otps SET is_used = 1 WHERE id = ?", (record['id'],))
 
-                if user_id:
-                    if otp_type == 'mobile':
-                        cursor.execute("UPDATE users SET is_mobile_verified = 1 WHERE id = ?", (user_id,))
+                # Determine which user to mark verified
+                v_target = record['target']
+                v_type = record['target_type']
+                target_user_id = record['user_id'] or user_id
+
+                if target_user_id:
+                    if v_type == 'mobile':
+                        cursor.execute("UPDATE users SET is_mobile_verified = 1 WHERE id = ?", (target_user_id,))
                     else:
-                        cursor.execute("UPDATE users SET is_email_verified = 1 WHERE id = ?", (user_id,))
+                        cursor.execute("UPDATE users SET is_email_verified = 1 WHERE id = ?", (target_user_id,))
                 else:
-                    if otp_type == 'mobile':
-                        cursor.execute("UPDATE users SET is_mobile_verified = 1 WHERE phone = ?", (target,))
+                    if v_type == 'mobile':
+                        cursor.execute("UPDATE users SET is_mobile_verified = 1 WHERE phone = ?", (v_target,))
                     else:
-                        cursor.execute("UPDATE users SET is_email_verified = 1 WHERE LOWER(email) = LOWER(?)", (target,))
+                        cursor.execute("UPDATE users SET is_email_verified = 1 WHERE LOWER(email) = LOWER(?)", (v_target,))
 
                 conn.commit()
 
                 return self.send_json(200, {
                     'success': True,
-                    'message': f"{otp_type.capitalize()} verified successfully!",
-                    'target': target,
-                    'type': otp_type
+                    'message': f"{v_type.capitalize()} verified successfully!",
+                    'target': v_target,
+                    'type': v_type
                 })
 
             # POST /api/coupons/validate
@@ -618,26 +734,15 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     'value': coupon['value']
                 })
 
-            # POST /api/bookings
+            # POST /api/bookings (Atomic slot capacity check and IDOR protection)
             elif path == '/api/bookings':
-                user_id = payload.get('user_id')
-                token_header = self.headers.get('Authorization', '')
-
-                # Resolve user_id from Bearer token if not explicitly provided
-                if not user_id and token_header.startswith('Bearer '):
-                    token = token_header.replace('Bearer ', '').strip()
-                    if token.startswith('token_'):
-                        try:
-                            user_id = int(token.split('_')[1])
-                        except Exception:
-                            pass
-
-                # Strict Authentication Requirement: Guest bookings are disabled
-                if not user_id:
+                caller = self.get_authenticated_user(conn)
+                if not caller:
                     return self.send_json(401, {
                         'error': 'Sign in required. Please log in or create an account to schedule a cleaning appointment.'
                     })
 
+                user_id = caller['id']
                 cursor = conn.cursor()
                 cursor.execute("SELECT id, name, email, phone FROM users WHERE id = ?", (user_id,))
                 user_row = cursor.fetchone()
@@ -658,6 +763,18 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
 
                 if not name or not phone or not service_date or not service_slot or not items:
                     return self.send_json(400, {'error': 'Missing required booking details'})
+
+                # Atomic Slot Capacity Check: prevent double booking race condition
+                cursor.execute("""
+                    SELECT COUNT(*) as count 
+                    FROM bookings 
+                    WHERE service_date = ? AND service_slot = ? AND status != 'cancelled'
+                """, (service_date, service_slot))
+                slot_occupancy = cursor.fetchone()['count']
+                if slot_occupancy >= 3:
+                    return self.send_json(409, {
+                        'error': f'The selected slot ({service_slot}) on {service_date} is fully booked. Please choose another time slot.'
+                    })
 
                 # Get pricing config
                 cursor.execute("SELECT * FROM pricing_config WHERE id = 1")
@@ -709,8 +826,8 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 tax = round((taxable_amount * (gst_pct / 100.0)), 2)
                 total_amount = round(taxable_amount + tax, 2)
 
-                # Generate unique booking ID
-                booking_id = generate_booking_id()
+                # Generate cryptographically secure booking ID
+                booking_id = generate_booking_id(conn)
 
                 cursor.execute("""
                     INSERT INTO bookings (
@@ -730,8 +847,8 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                         VALUES (?, ?, ?, ?, ?, ?)
                     """, (booking_id, ci['service_name'], ci['variant_name'], ci['quantity'], ci['unit_price'], ci['total_price']))
 
-                # Save address if user logged in
-                if user_id and address_data.get('house_flat'):
+                # Save address for authenticated user
+                if address_data.get('house_flat'):
                     cursor.execute("""
                         INSERT INTO addresses (user_id, house_flat, street, area, city, pincode, instructions, is_default)
                         VALUES (?, ?, ?, ?, ?, ?, ?, 0)
@@ -755,15 +872,38 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     'service_slot': service_slot
                 })
 
-            # POST /api/reviews
+            # POST /api/reviews (Authenticated, completed booking, and anti-tamper)
             elif path == '/api/reviews':
+                caller = self.get_authenticated_user(conn)
+                if not caller:
+                    return self.send_json(401, {'error': 'Authentication required to submit a review'})
+
                 booking_id = payload.get('booking_id')
-                user_name = payload.get('user_name', 'Customer').strip()
+                user_name = payload.get('user_name', caller['name']).strip()
                 rating = int(payload.get('rating', 5))
                 comment = payload.get('comment', '').strip()
                 service_type = payload.get('service_type', 'Sofa Cleaning').strip()
 
+                if not booking_id or not comment:
+                    return self.send_json(400, {'error': 'Booking ID and review comment are required'})
+
                 cursor = conn.cursor()
+                cursor.execute("SELECT * FROM bookings WHERE id = ?", (booking_id,))
+                booking = cursor.fetchone()
+                if not booking:
+                    return self.send_json(404, {'error': 'Booking not found'})
+
+                # RBAC & IDOR: Customers can only review their own bookings
+                if caller['role'] != 'admin' and str(booking['user_id']) != str(caller['id']):
+                    return self.send_json(403, {'error': 'Access denied: You can only review your own bookings'})
+
+                if booking['status'] != 'completed':
+                    return self.send_json(400, {'error': 'Reviews can only be submitted after the service is marked completed'})
+
+                cursor.execute("SELECT id FROM reviews WHERE booking_id = ?", (booking_id,))
+                if cursor.fetchone():
+                    return self.send_json(400, {'error': 'A review has already been submitted for this booking'})
+
                 cursor.execute("""
                     INSERT INTO reviews (booking_id, user_name, rating, comment, service_type, created_at)
                     VALUES (?, ?, ?, ?, ?, ?)

@@ -1,5 +1,7 @@
 import sqlite3
 import hashlib
+import hmac
+import secrets
 import json
 import os
 from datetime import datetime
@@ -7,8 +9,36 @@ from datetime import datetime
 DB_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
 DB_PATH = os.path.join(DB_DIR, 'siri_sofa.db')
 
-def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+def hash_password(password: str, salt: str = None) -> str:
+    """PBKDF2-HMAC-SHA256 password hashing with 100,000 iterations (OWASP compliant)"""
+    if not salt:
+        salt = secrets.token_hex(16)
+    derived = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt.encode('utf-8'), 100000).hex()
+    return f"pbkdf2:sha256:100000${salt}${derived}"
+
+def verify_password(password: str, stored_hash: str) -> bool:
+    """Verify password against PBKDF2-HMAC-SHA256 hash or legacy SHA-256 hash"""
+    if not stored_hash:
+        return False
+    if stored_hash.startswith("pbkdf2:sha256:"):
+        parts = stored_hash.split('$')
+        if len(parts) != 3:
+            return False
+        _, salt, expected_derived = parts
+        check_derived = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt.encode('utf-8'), 100000).hex()
+        return hmac.compare_digest(check_derived, expected_derived)
+    # Backward compatibility with existing development SHA-256 hashes
+    legacy_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
+    return hmac.compare_digest(legacy_hash, stored_hash)
+
+def hash_otp(otp_code: str, salt: str = "siri_otp_salt_2026") -> str:
+    """Hash one-time passcode with salt before saving to database"""
+    return hashlib.sha256(f"{salt}:{otp_code.strip()}".encode('utf-8')).hexdigest()
+
+def verify_otp_hash(otp_code: str, stored_hash: str, salt: str = "siri_otp_salt_2026") -> bool:
+    """Constant-time comparison for OTP verification"""
+    candidate = hash_otp(otp_code, salt)
+    return hmac.compare_digest(candidate, stored_hash)
 
 def get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
@@ -34,11 +64,25 @@ def init_db(db_path: str = DB_PATH):
         created_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS user_sessions (
+        session_token TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        role TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        ip_address TEXT,
+        user_agent TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS verification_otps (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        challenge_id TEXT,
+        user_id INTEGER,
         target TEXT NOT NULL,
         target_type TEXT NOT NULL,
-        otp_code TEXT NOT NULL,
+        otp_hash TEXT,
+        otp_code TEXT,
         expires_at TEXT NOT NULL,
         attempts INTEGER DEFAULT 0,
         is_used INTEGER DEFAULT 0,
@@ -170,6 +214,31 @@ def init_db(db_path: str = DB_PATH):
         cursor.execute("ALTER TABLE users ADD COLUMN is_mobile_verified INTEGER DEFAULT 0")
     except Exception:
         pass
+    try:
+        cursor.execute("ALTER TABLE verification_otps ADD COLUMN challenge_id TEXT")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE verification_otps ADD COLUMN otp_hash TEXT")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE verification_otps ADD COLUMN user_id INTEGER")
+    except Exception:
+        pass
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS user_sessions (
+        session_token TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        role TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        ip_address TEXT,
+        user_agent TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    """)
 
     conn.commit()
     seed_data(conn)
@@ -184,7 +253,8 @@ def seed_data(conn: sqlite3.Connection):
 
     now = datetime.now().isoformat()
 
-    admin_pw = hash_password("admin123")
+    admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
+    admin_pw = hash_password(admin_password)
     cursor.execute("""
         INSERT INTO users (name, email, phone, password_hash, role, is_email_verified, is_mobile_verified, created_at)
         VALUES 

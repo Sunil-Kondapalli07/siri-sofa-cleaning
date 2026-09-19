@@ -77,113 +77,8 @@ const ApiClient = {
       if (code === 'SIRI20') return { valid: true, discount_percent: 20, message: '20% Discount Applied' };
       throw new Error('Invalid coupon code');
     }
-    if (endpoint === '/api/auth/register') {
-      const users = JSON.parse(localStorage.getItem('siri_users') || '[]');
-      const regEmail = (body.email || '').trim().toLowerCase();
-      const regPhone = (body.phone || '').replace(/[^0-9]/g, '').slice(-10);
-
-      if (regEmail === 'admin@sirisofa.com' || users.some(u => (u.email || '').toLowerCase() === regEmail)) {
-        throw new Error('User already exists with this email address. Please sign in instead.');
-      }
-      if (regPhone === '9800000000' || users.some(u => (u.phone || '').replace(/[^0-9]/g, '').slice(-10) === regPhone)) {
-        throw new Error('User already exists with this mobile number. Please sign in instead.');
-      }
-
-      const mCode = String(Math.floor(100000 + Math.random() * 900000));
-      const eCode = String(Math.floor(100000 + Math.random() * 900000));
-      const activeOtps = JSON.parse(localStorage.getItem('siri_active_otps') || '{}');
-      if (body.phone) activeOtps[body.phone] = { code: mCode, attempts: 0 };
-      if (body.email) activeOtps[regEmail] = { code: eCode, attempts: 0 };
-      localStorage.setItem('siri_active_otps', JSON.stringify(activeOtps));
-
-      const u = {
-        id: Date.now(),
-        name: body.name || 'Customer',
-        email: body.email,
-        phone: body.phone,
-        password: body.password,
-        role: 'customer',
-        is_email_verified: false,
-        is_mobile_verified: false
-      };
-      users.push(u);
-      localStorage.setItem('siri_users', JSON.stringify(users));
-
-      return { 
-        success: true, 
-        user: u, 
-        token: `token_${u.id}_${Date.now()}`, 
-        requires_verification: true,
-        dev_mobile_code: mCode,
-        dev_email_code: eCode,
-        mobile_delivered: false,
-        email_delivered: false,
-        message: 'Account created! Verification codes dispatched.'
-      };
-    }
-    if (endpoint === '/api/auth/login') {
-      const isAdmin = body.email === 'admin@sirisofa.com' && body.password === 'admin123';
-      const users = JSON.parse(localStorage.getItem('siri_users') || '[]');
-      const foundUser = users.find(u => 
-        (u.email && u.email.toLowerCase() === (body.email || '').toLowerCase()) ||
-        (u.phone && u.phone.replace(/[^0-9]/g, '').slice(-10) === (body.email || '').replace(/[^0-9]/g, '').slice(-10))
-      );
-
-      if (!isAdmin && !foundUser) {
-        throw new Error('Invalid email or password. Please check your credentials or create an account.');
-      }
-
-      const u = isAdmin ? {
-        id: 1,
-        name: 'Siri Operations Admin',
-        email: 'admin@sirisofa.com',
-        phone: '+91 98000 00000',
-        role: 'admin',
-        is_email_verified: true,
-        is_mobile_verified: true
-      } : foundUser;
-
-      return { success: true, user: u, token: `token_${u.id}_${Date.now()}` };
-    }
-    if (endpoint === '/api/auth/otp/send') {
-      const target = (body.target || '').trim();
-      const code = String(Math.floor(100000 + Math.random() * 900000));
-      const activeOtps = JSON.parse(localStorage.getItem('siri_active_otps') || '{}');
-      activeOtps[target] = { code: code, attempts: 0 };
-      if (target.includes('@')) activeOtps[target.toLowerCase()] = { code: code, attempts: 0 };
-      localStorage.setItem('siri_demo_otps', JSON.stringify(activeOtps));
-      localStorage.setItem('siri_active_otps', JSON.stringify(activeOtps));
-      return { 
-        success: true, 
-        message: `Verification code sent to ${target}`, 
-        dev_code: code, 
-        delivered: false 
-      };
-    }
-    if (endpoint === '/api/auth/otp/verify') {
-      const target = (body.target || '').trim();
-      const submittedCode = String(body.otp_code || '').trim();
-      const activeOtps = JSON.parse(localStorage.getItem('siri_active_otps') || '{}');
-      const record = activeOtps[target] || (target.includes('@') ? activeOtps[target.toLowerCase()] : null);
-
-      if (!record) {
-        throw new Error('No active verification code found for this destination. Please request a new code.');
-      }
-      if (record.attempts >= 5) {
-        throw new Error('Maximum verification attempts exceeded. Please request a new code.');
-      }
-      if (record.code !== submittedCode) {
-        record.attempts = (record.attempts || 0) + 1;
-        activeOtps[target] = record;
-        localStorage.setItem('siri_active_otps', JSON.stringify(activeOtps));
-        const remaining = Math.max(0, 5 - record.attempts);
-        throw new Error(`Incorrect verification code. ${remaining} attempts remaining.`);
-      }
-
-      delete activeOtps[target];
-      if (target.includes('@')) delete activeOtps[target.toLowerCase()];
-      localStorage.setItem('siri_active_otps', JSON.stringify(activeOtps));
-      return { success: true, message: 'Verified successfully' };
+    if (endpoint.startsWith('/api/auth/')) {
+      throw new Error('Authentication, registration and OTP operations require connecting to the live Siri Sofa API server. Please ensure the backend is running at http://localhost:8000.');
     }
     if (endpoint === '/api/bookings' && method === 'POST') {
       const curUser = this.getCurrentUser();
@@ -331,14 +226,31 @@ const ApiClient = {
     });
   },
 
-  async verifyOtp(target, type, otpCode, userId = null) {
+  async verifyOtp(targetOrChallenge, type, otpCode, userId = null) {
+    const payload = { otp_code: otpCode };
+    if (typeof targetOrChallenge === 'object' && targetOrChallenge !== null) {
+      Object.assign(payload, targetOrChallenge);
+    } else if (targetOrChallenge && targetOrChallenge.length > 20) {
+      payload.challenge_id = targetOrChallenge;
+      if (type) payload.type = type;
+      if (userId) payload.user_id = userId;
+    } else {
+      payload.target = targetOrChallenge;
+      payload.type = type;
+      if (userId) payload.user_id = userId;
+    }
     return await this.request('/api/auth/otp/verify', {
       method: 'POST',
-      body: JSON.stringify({ target, type, otp_code: otpCode, user_id: userId })
+      body: JSON.stringify(payload)
     });
   },
 
-  logout() {
+  async logout() {
+    try {
+      await this.request('/api/auth/logout', { method: 'POST' });
+    } catch (e) {
+      // Ignore network errors during logout
+    }
     localStorage.removeItem('siri_token');
     localStorage.removeItem('siri_user');
     localStorage.removeItem('siri_active_otps');

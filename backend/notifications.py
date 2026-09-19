@@ -9,10 +9,15 @@ import sys
 import json
 import ssl
 import smtplib
+import secrets
 import urllib.request
 import urllib.parse
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+
+def generate_secure_otp(length: int = 6) -> str:
+    """Generate a cryptographically secure numeric OTP using system CSPRNG (secrets module)"""
+    return f"{secrets.randbelow(900000) + 100000}"
 
 def load_dotenv():
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

@@ -1,6 +1,10 @@
+
 import os
 import sys
-from fastapi import FastAPI, HTTPException, Depends
+import json
+from datetime import datetime
+from fastapi import FastAPI, HTTPException, Depends, Security
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -16,15 +20,56 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Restrict CORS origins in production
+cors_env = os.environ.get("CORS_ORIGINS", "")
+if cors_env:
+    allowed_origins = [o.strip() for o in cors_env.split(",") if o.strip()]
+else:
+    allowed_origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000"
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'frontend')
+
+security = HTTPBearer(auto_error=False)
+
+def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Security(security)) -> Dict[str, Any]:
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required. Please provide a valid session token.")
+
+    token = credentials.credentials
+    conn = database.get_connection()
+    try:
+        cursor = conn.cursor()
+        now_str = datetime.now().isoformat()
+        cursor.execute("""
+            SELECT u.id, u.name, u.email, u.phone, u.role, u.is_email_verified, u.is_mobile_verified
+            FROM user_sessions s
+            JOIN users u ON s.user_id = u.id
+            WHERE s.session_token = ? AND s.expires_at > ?
+        """, (token, now_str))
+        user = cursor.fetchone()
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid or expired session token")
+        return dict(user)
+    finally:
+        conn.close()
+
+def get_current_admin(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    return user
 
 @app.on_event("startup")
 def startup_event():
@@ -68,7 +113,7 @@ def get_pricing():
         conn.close()
 
 @app.put("/api/pricing")
-def update_pricing(payload: Dict[str, Any]):
+def update_pricing(payload: Dict[str, Any], admin: Dict[str, Any] = Depends(get_current_admin)):
     conn = database.get_connection()
     try:
         cursor = conn.cursor()
@@ -114,28 +159,42 @@ def get_slots(date: str):
         conn.close()
 
 @app.get("/api/bookings")
-def get_bookings(user_id: Optional[int] = None, status: Optional[str] = None):
+def get_bookings(
+    user_id: Optional[int] = None, 
+    status: Optional[str] = None,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     conn = database.get_connection()
     try:
         cursor = conn.cursor()
         query = "SELECT b.*, t.name as technician_name, t.phone as technician_phone FROM bookings b LEFT JOIN technicians t ON b.technician_id = t.id"
         params = []
         clauses = []
-        if user_id:
+
+        # Enforce IDOR protection: Customers can ONLY query their own bookings
+        if current_user.get("role") == "customer":
             clauses.append("b.user_id = ?")
-            params.append(user_id)
+            params.append(current_user["id"])
+        elif current_user.get("role") == "admin":
+            if user_id:
+                clauses.append("b.user_id = ?")
+                params.append(user_id)
+
         if status and status != 'all':
             clauses.append("b.status = ?")
             params.append(status)
+
         if clauses:
             query += " WHERE " + " AND ".join(clauses)
         query += " ORDER BY b.created_at DESC"
         cursor.execute(query, params)
         bookings = []
-        import json
         for r in cursor.fetchall():
             bd = dict(r)
-            bd['address'] = json.loads(bd['address_json'])
+            try:
+                bd['address'] = json.loads(bd['address_json'])
+            except Exception:
+                bd['address'] = {}
             cursor.execute("SELECT * FROM booking_items WHERE booking_id = ?", (bd['id'],))
             bd['items'] = [dict(i) for i in cursor.fetchall()]
             bookings.append(bd)
