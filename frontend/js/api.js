@@ -1,6 +1,8 @@
 /**
  * Siri Sofa Services — API Client
- */const API_BASE = window.API_BASE 
+ * Production Hardened: Server-Only Authentication, Zero Insecure LocalStorage Fallbacks
+ */
+const API_BASE = window.API_BASE 
   || window.localStorage.getItem('siri_api_base')
   || (window.location.port && window.location.port !== '8000' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:8000' : '');
 
@@ -27,174 +29,19 @@ const ApiClient = {
       const response = await fetch(`${API_BASE}${endpoint}`, config);
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || `HTTP ${response.status}: Failed request`);
+        throw new Error(data.detail || data.error || `HTTP ${response.status}: Failed request`);
       }
       return data;
     } catch (err) {
-      // Fallback ONLY for static hosting (e.g. GitHub Pages or file: protocol) where no Python backend can run
-      const isStaticEnv = window.location.hostname.includes('github.io') || window.location.protocol === 'file:';
-      if (isStaticEnv) {
-        try {
-          return this.handleStaticFallback(endpoint, options);
-        } catch (fallbackErr) {
-          throw fallbackErr;
-        }
-      }
       console.error(`API Error [${endpoint}]:`, err);
+      if (err.name === 'TypeError' || err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+        throw new Error("Unable to reach the Siri Sofa API server. Please verify your connection or ensure the backend is running at http://localhost:8000.");
+      }
       throw err;
     }
   },
 
-  handleStaticFallback(endpoint, options = {}) {
-    const method = (options.method || 'GET').toUpperCase();
-    const body = options.body ? JSON.parse(options.body) : {};
-
-    if (endpoint === '/api/services') {
-      return { services: typeof store !== 'undefined' && store.getFallbackServices ? store.getFallbackServices() : [] };
-    }
-    if (endpoint === '/api/pricing') {
-      return { config: { min_booking_amount: 499, service_charge: 49, gst_percentage: 18 } };
-    }
-    if (endpoint.startsWith('/api/slots/available')) {
-      return {
-        date: new URLSearchParams(endpoint.split('?')[1] || '').get('date') || '2026-09-25',
-        slots: ['09:00 AM', '11:30 AM', '02:00 PM', '04:30 PM', '06:30 PM']
-      };
-    }
-    if (endpoint === '/api/reviews') {
-      return {
-        reviews: [
-          { id: 1, user_name: 'Vikram Reddy', rating: 5, comment: 'Technician Raj Kumar explained the 6-step hygiene process and showed remarkable before/after results on our 3-seater sofa.', service_type: 'Sofa Cleaning', created_at: '2026-08-20T14:30:00' },
-          { id: 2, user_name: 'Ananya R.', rating: 5, comment: 'The 3D sofa selector made booking so straightforward. Pricing was clear and the dirt extraction was eye-opening!', service_type: 'Sofa Cleaning', created_at: '2026-09-02T09:15:00' },
-          { id: 3, user_name: 'Dr. Arishetty', rating: 5, comment: 'Mattress and sofa sanitization done professionally. Very hygienic uniforms and sealed eco-friendly solutions.', service_type: 'Mattress Cleaning', created_at: '2026-09-12T16:00:00' }
-        ]
-      };
-    }
-    if (endpoint === '/api/coupons/validate') {
-      const code = (body.code || '').toUpperCase();
-      if (code === 'FRESH50') return { valid: true, discount: 150, message: '₹150 Flat Discount Applied' };
-      if (code === 'FIRST100') return { valid: true, discount: 100, message: '₹100 First Order Discount Applied' };
-      if (code === 'SIRI20') return { valid: true, discount_percent: 20, message: '20% Discount Applied' };
-      throw new Error('Invalid coupon code');
-    }
-    if (endpoint.startsWith('/api/auth/')) {
-      throw new Error('Authentication, registration and OTP operations require connecting to the live Siri Sofa API server. Please ensure the backend is running at http://localhost:8000.');
-    }
-    if (endpoint === '/api/bookings' && method === 'POST') {
-      const curUser = this.getCurrentUser();
-      if (!curUser && !body.user_id) {
-        throw new Error('Sign in required. Please log in or create an account to book an appointment.');
-      }
-      const bookingId = 'SIRI-' + Math.floor(100000 + Math.random() * 900000);
-      let addr = {};
-      try {
-        addr = typeof body.address === 'object' ? (body.address || {}) : JSON.parse(body.address || '{}');
-      } catch (e) {
-        addr = {};
-      }
-      const b = {
-        id: bookingId,
-        user_id: curUser ? curUser.id : (body.user_id || null),
-        customer_name: body.customer_name || body.name || (curUser ? curUser.name : 'Customer'),
-        customer_phone: body.customer_phone || body.phone || (curUser ? curUser.phone : '+91 98480 12345'),
-        customer_email: body.customer_email || body.email || (curUser ? curUser.email : 'customer@example.com'),
-        address: addr,
-        address_json: JSON.stringify(addr),
-        service_date: body.service_date || new Date().toISOString().split('T')[0],
-        service_slot: body.service_slot || '10:30 AM',
-        total_amount: body.total_amount || 1499,
-        status: 'confirmed',
-        technician_name: 'Raj Kumar',
-        technician_phone: '+91 98480 11223',
-        technician_rating: 4.9,
-        created_at: new Date().toISOString(),
-        items: (body.items && body.items.length) ? body.items : [
-          { id: 1, variant_name: 'Sofa Deep Cleaning & Sanitization', service_name: 'Sofa Cleaning', quantity: 1, total_price: body.total_amount || 1499 }
-        ]
-      };
-      const existing = JSON.parse(localStorage.getItem('siri_bookings') || '[]');
-      existing.unshift(b);
-      localStorage.setItem('siri_bookings', JSON.stringify(existing));
-      return { success: true, booking_id: bookingId, booking: b };
-    }
-    if (endpoint.includes('/reschedule')) {
-      const bId = endpoint.split('/')[3];
-      const existing = JSON.parse(localStorage.getItem('siri_bookings') || '[]');
-      const idx = existing.findIndex(x => x.id && x.id.toUpperCase() === (bId || '').toUpperCase());
-      if (idx !== -1) {
-        existing[idx].service_date = body.service_date;
-        existing[idx].service_slot = body.service_slot;
-        localStorage.setItem('siri_bookings', JSON.stringify(existing));
-      }
-      return { success: true, message: `Booking ${bId} rescheduled to ${body.service_date} at ${body.service_slot}` };
-    }
-    if (endpoint.includes('/status')) {
-      const bId = endpoint.split('/')[3];
-      const existing = JSON.parse(localStorage.getItem('siri_bookings') || '[]');
-      const idx = existing.findIndex(x => x.id && x.id.toUpperCase() === (bId || '').toUpperCase());
-      if (idx !== -1) {
-        existing[idx].status = body.status;
-        localStorage.setItem('siri_bookings', JSON.stringify(existing));
-      }
-      return { success: true, message: 'Status updated' };
-    }
-    if (endpoint.includes('/assign')) {
-      const bId = endpoint.split('/')[3];
-      const existing = JSON.parse(localStorage.getItem('siri_bookings') || '[]');
-      const idx = existing.findIndex(x => x.id && x.id.toUpperCase() === (bId || '').toUpperCase());
-      if (idx !== -1) {
-        existing[idx].technician_id = body.technician_id;
-        existing[idx].status = 'assigned';
-        localStorage.setItem('siri_bookings', JSON.stringify(existing));
-      }
-      return { success: true, message: 'Technician assigned' };
-    }
-    if (endpoint === '/api/bookings' || endpoint.startsWith('/api/bookings?')) {
-      const existing = JSON.parse(localStorage.getItem('siri_bookings') || '[]');
-      const curUser = this.getCurrentUser();
-      const urlParams = new URLSearchParams(endpoint.includes('?') ? endpoint.split('?')[1] : '');
-      const queryUserId = urlParams.get('user_id') || (curUser && curUser.role !== 'admin' ? curUser.id : null);
-      if (queryUserId) {
-        return { bookings: existing.filter(b => b.user_id && String(b.user_id) === String(queryUserId)) };
-      }
-      return { bookings: curUser && curUser.role === 'admin' ? existing : [] };
-    }
-    if (endpoint.startsWith('/api/bookings/')) {
-      const bId = endpoint.split('/')[3];
-      const existing = JSON.parse(localStorage.getItem('siri_bookings') || '[]');
-      let found = existing.find(x => x.id && x.id.toUpperCase() === (bId || '').toUpperCase());
-      if (!found) {
-        throw new Error(`Booking reference ${bId} not found`);
-      }
-      return { booking: found };
-    }
-    if (endpoint === '/api/technicians') {
-      return {
-        technicians: [
-          { id: 1, name: 'Raj Kumar', phone: '+91 98480 11223', rating: 4.9, jobs_completed: 142, status: 'available' },
-          { id: 2, name: 'Ravi Teja', phone: '+91 98480 22334', rating: 4.8, jobs_completed: 98, status: 'busy' }
-        ]
-      };
-    }
-    if (endpoint === '/api/analytics') {
-      return {
-        metrics: {
-          total_revenue: 124500,
-          total_bookings: 84,
-          today_bookings: 6,
-          completed_bookings: 72,
-          average_order_value: 1482
-        },
-        services_breakdown: [
-          { service_name: 'Sofa Cleaning', bookings_count: 52, service_revenue: 78900 },
-          { service_name: 'Mattress Cleaning', bookings_count: 18, service_revenue: 26500 }
-        ]
-      };
-    }
-    return {};
-  },
-
-  // Auth
+  // Auth (Strictly server-side; passwords never saved in browser storage)
   async login(email, password) {
     const res = await this.request('/api/auth/login', {
       method: 'POST',
@@ -226,19 +73,25 @@ const ApiClient = {
     });
   },
 
-  async verifyOtp(targetOrChallenge, type, otpCode, userId = null) {
-    const payload = { otp_code: otpCode };
-    if (typeof targetOrChallenge === 'object' && targetOrChallenge !== null) {
-      Object.assign(payload, targetOrChallenge);
-    } else if (targetOrChallenge && targetOrChallenge.length > 20) {
-      payload.challenge_id = targetOrChallenge;
-      if (type) payload.type = type;
-      if (userId) payload.user_id = userId;
+  async verifyOtp(challengeOrTarget, typeOrCode, otpCode = null) {
+    let payload = {};
+    if (typeof challengeOrTarget === 'object' && challengeOrTarget !== null) {
+      payload = { ...challengeOrTarget };
+    } else if (otpCode !== null) {
+      // Called as verifyOtp(challengeId, type, otpCode) or verifyOtp(target, type, otpCode)
+      if (challengeOrTarget && challengeOrTarget.length > 20) {
+        payload.challenge_id = challengeOrTarget;
+      } else {
+        payload.target = challengeOrTarget;
+        payload.type = typeOrCode;
+      }
+      payload.otp_code = otpCode;
     } else {
-      payload.target = targetOrChallenge;
-      payload.type = type;
-      if (userId) payload.user_id = userId;
+      // Called as verifyOtp(challengeId, otpCode)
+      payload.challenge_id = challengeOrTarget;
+      payload.otp_code = typeOrCode;
     }
+
     return await this.request('/api/auth/otp/verify', {
       method: 'POST',
       body: JSON.stringify(payload)
@@ -253,8 +106,6 @@ const ApiClient = {
     }
     localStorage.removeItem('siri_token');
     localStorage.removeItem('siri_user');
-    localStorage.removeItem('siri_active_otps');
-    localStorage.removeItem('siri_demo_otps');
   },
 
   getCurrentUser() {
@@ -328,7 +179,7 @@ const ApiClient = {
     });
   },
 
-  // Technicians
+  // Technicians (Admin only)
   async getTechnicians() {
     return await this.request('/api/technicians');
   },
@@ -348,7 +199,7 @@ const ApiClient = {
     });
   },
 
-  // Analytics
+  // Analytics (Admin only)
   async getAnalytics() {
     return await this.request('/api/analytics');
   },

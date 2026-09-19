@@ -57,20 +57,28 @@ Then open your browser at:
 
 ---
 
-## 🔑 Default Accounts & Access
+## 🔑 Authentication & Production Configuration
 
-| Role | Email | Password | Access / Notes |
-|---|---|---|---|
-| **Admin HQ** | `admin@sirisofa.com` | `admin123` | Operations HQ, Live Dynamic Pricing, Dispatching Technicians, Analytics |
-| **New Customers** | *Any email* | *Your choice* | Click **Sign Up**, verify real-time Mobile & Email OTPs, and access customer portal |
+Authentication is managed entirely server-side with OWASP PBKDF2-HMAC-SHA256 password hashing and cryptographically secure session management.
+
+| Role | Configuration | Access / Notes |
+|---|---|---|
+| **Admin HQ** | Configured via `ADMIN_EMAIL` & `ADMIN_PASSWORD` | Operations HQ, Live Dynamic Pricing, Dispatching Technicians, Analytics |
+| **New Customers** | Self-serve signup | Click **Sign Up**, verify dual Mobile & Email OTPs, and access customer dashboard |
 
 ---
 
 ## ⚙️ Configuration (`.env`)
 
-Copy `.env.example` to `.env` to configure real SMTP and SMS gateways:
+Copy `.env.example` to `.env` to configure platform secrets and messaging gateways:
 
 ```env
+# Server Security
+SECRET_KEY=siri-sofa-strong-secret-key-change-in-production
+ADMIN_EMAIL=admin@sirisofa.com
+ADMIN_PASSWORD=your_strong_admin_password_here
+CORS_ORIGINS=http://localhost:8000,http://localhost:3000
+
 # Email (SMTP)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=465

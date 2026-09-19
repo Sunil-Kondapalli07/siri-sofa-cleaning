@@ -22,7 +22,7 @@ if __name__ == '__main__':
     init_db()
     print("🚀 Starting Web & REST API Server...")
     print("👉 Open your browser at: http://localhost:8000")
-    print("👉 Admin Portal:  admin@sirisofa.com / admin123")
+    print("👉 Admin Portal:  Configured via ADMIN_EMAIL / ADMIN_PASSWORD environment variables")
     print("👉 New Customers: Instant live signup with real-time OTP verification")
     print("=" * 60)
     run_server()

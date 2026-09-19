@@ -9,6 +9,7 @@ import tempfile
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import database
 import server
+import notifications
 
 class MockSocket:
     def __init__(self, raw_input: bytes):
@@ -159,39 +160,39 @@ class DirectHandlerTest(unittest.TestCase):
         # Crucial security check: OTP plaintext MUST NOT be returned in API response
         self.assertNotIn('dev_mobile_code', body)
         self.assertNotIn('dev_email_code', body)
+        self.assertIn('mobile_challenge_id', body)
+        self.assertIn('email_challenge_id', body)
 
-        # Check notifications_log to retrieve the real delivered verification codes
+        # Check notifications_log to ensure PLAINTEXT OTP IS REDACTED from logs
         conn = database.get_connection(self.test_db)
         c = conn.cursor()
         c.execute("SELECT message FROM notifications_log WHERE recipient = ? ORDER BY id DESC LIMIT 1", (test_phone,))
         m_msg = c.fetchone()[0]
-        m_match = re.search(r'\b\d{6}\b', m_msg)
-        self.assertIsNotNone(m_match)
-        mobile_otp = m_match.group(0)
+        self.assertIsNone(re.search(r'\b\d{6}\b', m_msg), "Security failure: OTP must not be logged in notifications_log")
 
         c.execute("SELECT message FROM notifications_log WHERE recipient = ? ORDER BY id DESC LIMIT 1", (test_email,))
         e_msg = c.fetchone()[0]
-        e_match = re.search(r'\b\d{6}\b', e_msg)
-        self.assertIsNotNone(e_match)
-        email_otp = e_match.group(0)
+        self.assertIsNone(re.search(r'\b\d{6}\b', e_msg), "Security failure: OTP must not be logged in notifications_log")
         conn.close()
 
-        # Verify Mobile OTP
+        # Retrieve test dispatched code from secure test memory hook
+        mobile_otp = notifications.get_test_last_dispatched(test_phone)
+        email_otp = notifications.get_test_last_dispatched(test_email)
+        self.assertTrue(len(mobile_otp) == 6)
+        self.assertTrue(len(email_otp) == 6)
+
+        # Verify Mobile OTP using challenge_id
         status_m, res_m = self.invoke_api('POST', '/api/auth/otp/verify', {
-            'target': test_phone,
-            'type': 'mobile',
-            'otp_code': mobile_otp,
-            'user_id': body['user']['id']
+            'challenge_id': body['mobile_challenge_id'],
+            'otp_code': mobile_otp
         })
         self.assertEqual(status_m, 200)
         self.assertTrue(res_m['success'])
 
-        # Verify Email OTP
+        # Verify Email OTP using challenge_id
         status_e, res_e = self.invoke_api('POST', '/api/auth/otp/verify', {
-            'target': test_email,
-            'type': 'email',
-            'otp_code': email_otp,
-            'user_id': body['user']['id']
+            'challenge_id': body['email_challenge_id'],
+            'otp_code': email_otp
         })
         self.assertEqual(status_e, 200)
         self.assertTrue(res_e['success'])
@@ -224,16 +225,19 @@ class DirectHandlerTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertTrue(body['success'])
         self.assertNotIn('dev_code', body)
-        
-        # Read the dispatched OTP from notifications_log
+        self.assertIn('challenge_id', body)
+        challenge_id = body['challenge_id']
+
+        # Verify notifications_log contains no plain 6-digit OTP
         conn = database.get_connection(self.test_db)
         c = conn.cursor()
         c.execute("SELECT message FROM notifications_log WHERE recipient = ? ORDER BY id DESC LIMIT 1", ('+91 88776 65544',))
         msg = c.fetchone()[0]
         conn.close()
-        otp_match = re.search(r'\b\d{6}\b', msg)
-        self.assertIsNotNone(otp_match)
-        generated_otp = otp_match.group(0)
+        self.assertIsNone(re.search(r'\b\d{6}\b', msg))
+
+        # Retrieve generated OTP via test hook
+        generated_otp = notifications.get_test_last_dispatched('+91 88776 65544')
 
         # 2. Rate limit test (trying to send again immediately should fail with 429)
         status, r_body = self.invoke_api('POST', '/api/auth/otp/send', {
@@ -244,17 +248,15 @@ class DirectHandlerTest(unittest.TestCase):
 
         # 3. Invalid OTP test
         status, err = self.invoke_api('POST', '/api/auth/otp/verify', {
-            'target': '+91 88776 65544',
-            'type': 'mobile',
+            'challenge_id': challenge_id,
             'otp_code': '000000'
         })
         self.assertEqual(status, 400)
         self.assertIn('Incorrect code', err['error'])
 
-        # 4. Valid OTP verification
+        # 4. Valid OTP verification using challenge_id
         status, v_res = self.invoke_api('POST', '/api/auth/otp/verify', {
-            'target': '+91 88776 65544',
-            'type': 'mobile',
+            'challenge_id': challenge_id,
             'otp_code': generated_otp
         })
         self.assertEqual(status, 200)
