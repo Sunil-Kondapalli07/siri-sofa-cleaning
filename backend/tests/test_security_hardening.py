@@ -91,11 +91,11 @@ class SecurityHardeningTests(unittest.TestCase):
 
     # --- P0: Static Fallback Elimination ---
     def test_p0_static_fallback_completely_removed(self):
-        root_api_js = os.path.join(os.path.dirname(__file__), '..', '..', 'js', 'api.js')
-        frontend_api_js = os.path.join(os.path.dirname(__file__), '..', '..', 'frontend', 'js', 'api.js')
+        legacy_api_js = os.path.join(os.path.dirname(__file__), '..', '..', 'legacy_backup', 'frontend', 'js', 'api.js')
+        web_api_ts = os.path.join(os.path.dirname(__file__), '..', '..', 'web', 'src', 'lib', 'api.ts')
 
-        paths = [p for p in (root_api_js, frontend_api_js) if os.path.exists(p)]
-        self.assertTrue(len(paths) > 0, "api.js must exist in frontend")
+        paths = [p for p in (legacy_api_js, web_api_ts) if os.path.exists(p)]
+        self.assertTrue(len(paths) > 0, "api client must exist in web or legacy_backup")
         for path in paths:
             with open(path, 'r', encoding='utf-8') as f:
                 content = f.read()

@@ -20,7 +20,6 @@ load_dotenv()
 
 PORT = int(os.environ.get('PORT', 8000))
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FRONTEND_DIR = os.path.join(BASE_DIR, 'frontend')
 
 # Ensure DB is initialized
 init_db(DB_PATH)
@@ -147,48 +146,22 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
         if path.startswith('/api/'):
             return self.handle_api_get(path, query)
 
-        # Fallback to static file serving from FRONTEND_DIR
-        rel_path = path.lstrip('/')
-        if not rel_path:
-            rel_path = 'index.html'
+        # Root / health check for backend REST API
+        if path in ('/', '/health', '/api', '/api/'):
+            return self.send_json(200, {
+                'service': 'Siri Sofa Services — Backend REST API',
+                'status': 'online',
+                'frontend_url': 'http://localhost:3000',
+                'endpoints': {
+                    'services': '/api/services',
+                    'pricing': '/api/pricing',
+                    'slots': '/api/slots/available',
+                    'bookings': '/api/bookings',
+                    'auth': '/api/auth/login'
+                }
+            })
 
-        target_path = os.path.join(FRONTEND_DIR, rel_path)
-        # Normalize and prevent directory traversal
-        target_path = os.path.abspath(target_path)
-        if not target_path.startswith(FRONTEND_DIR):
-            self.send_error(403, "Access Denied")
-            return
-
-        # If file exists, serve it
-        if os.path.isfile(target_path):
-            return self.serve_static_file(target_path)
-
-        # SPA fallback for frontend client routes like /admin, /track, /book
-        spa_index = os.path.join(FRONTEND_DIR, 'index.html')
-        if os.path.isfile(spa_index):
-            return self.serve_static_file(spa_index)
-
-        self.send_error(404, "File Not Found")
-
-    def serve_static_file(self, filepath: str):
-        mime_type, _ = mimetypes.guess_type(filepath)
-        if not mime_type:
-            mime_type = 'application/octet-stream'
-        if filepath.endswith('.js'):
-            mime_type = 'application/javascript'
-        elif filepath.endswith('.css'):
-            mime_type = 'text/css'
-
-        try:
-            with open(filepath, 'rb') as f:
-                content = f.read()
-            self.send_response(200)
-            self.send_header('Content-Type', mime_type)
-            self.send_header('Content-Length', str(len(content)))
-            self.end_headers()
-            self.wfile.write(content)
-        except Exception as e:
-            self.send_error(500, f"Error reading file: {e}")
+        self.send_error(404, "Endpoint Not Found")
 
     def do_POST(self):
         parsed_url = urllib.parse.urlparse(self.path)
@@ -1090,8 +1063,8 @@ def run_server():
     # Enable socket reuse so restart doesn't fail with address already in use
     socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(server_address, SiriSofaHandler) as httpd:
-        print(f"🛋️ Siri Sofa Services Server running on http://localhost:{PORT}")
-        print(f"📁 Serving static files from {FRONTEND_DIR}")
+        print(f"🛋️ Siri Sofa Services REST API Server running on http://localhost:{PORT}")
+        print(f"👉 API Root: http://localhost:{PORT}/api/services")
         print(f"🗄️ Database connected at {DB_PATH}")
         try:
             httpd.serve_forever()
