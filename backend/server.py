@@ -13,6 +13,7 @@ from datetime import datetime, date, timedelta
 
 from database import get_connection, hash_password, verify_password, hash_otp, verify_otp_hash, DB_PATH, init_db
 from notifications import dispatch_verification_code, generate_secure_otp, load_dotenv
+from rate_limiter import limiter
 
 # Load .env variables
 load_dotenv()
@@ -448,12 +449,21 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
             if path == '/api/auth/login':
                 email = payload.get('email', '').strip().lower()
                 password = payload.get('password', '')
+
+                # Rate limiting: max 5 failed attempts per 5 minutes per IP + email
+                rate_key = f"login:{ip_addr}:{email}"
+                allowed, retry_sec = limiter.check(rate_key, max_requests=5, window_seconds=300)
+                if not allowed:
+                    return self.send_json(429, {'error': f'Too many login attempts. Please try again in {retry_sec} seconds.'})
+
                 cursor = conn.cursor()
                 cursor.execute("SELECT * FROM users WHERE LOWER(email) = ?", (email,))
                 user = cursor.fetchone()
                 if not user or not verify_password(password, user['password_hash']):
+                    limiter.record_failure(rate_key)
                     return self.send_json(401, {'error': 'Invalid email or password'})
 
+                limiter.reset(rate_key)
                 token = create_user_session(conn, user['id'], user['role'], ip_addr, user_agent)
 
                 u_dict = {
@@ -517,7 +527,7 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 if phone:
                     m_code = generate_secure_otp()
                     m_challenge = secrets.token_hex(16)
-                    m_hash = hash_otp(m_code)
+                    m_hash = hash_otp(m_code, m_challenge)
                     cursor.execute("""
                         INSERT INTO verification_otps (challenge_id, target, target_type, otp_hash, otp_code, expires_at, attempts, is_used, created_at, user_id)
                         VALUES (?, ?, 'mobile', ?, 'HASHED', ?, 0, 0, ?, ?)
@@ -527,12 +537,12 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     cursor.execute("""
                         INSERT INTO notifications_log (recipient, channel, message, status, created_at)
                         VALUES (?, 'mobile', ?, ?, ?)
-                    """, (phone, f"Your Siri Sofa Services verification code is {m_code}", 'delivered' if m_delivered else 'simulated_logged', now))
+                    """, (phone, f"Verification code dispatched via mobile. Status: {'delivered' if m_delivered else 'simulated'}. Delivery ID: {m_res.get('delivery_id', 'none')}", 'delivered' if m_delivered else 'simulated_logged', now))
 
                 # Dispatch Email OTP
                 e_code = generate_secure_otp()
                 e_challenge = secrets.token_hex(16)
-                e_hash = hash_otp(e_code)
+                e_hash = hash_otp(e_code, e_challenge)
                 cursor.execute("""
                     INSERT INTO verification_otps (challenge_id, target, target_type, otp_hash, otp_code, expires_at, attempts, is_used, created_at, user_id)
                     VALUES (?, ?, 'email', ?, 'HASHED', ?, 0, 0, ?, ?)
@@ -542,7 +552,7 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 cursor.execute("""
                     INSERT INTO notifications_log (recipient, channel, message, status, created_at)
                     VALUES (?, 'email', ?, ?, ?)
-                """, (email, f"Your Siri Sofa Services verification code is {e_code}", 'delivered' if e_delivered else 'simulated_logged', now))
+                """, (email, f"Verification code dispatched via email. Status: {'delivered' if e_delivered else 'simulated'}. Delivery ID: {e_res.get('delivery_id', 'none')}", 'delivered' if e_delivered else 'simulated_logged', now))
 
                 conn.commit()
 
@@ -578,9 +588,13 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 if not target:
                     return self.send_json(400, {'error': f'Please provide a valid {otp_type} destination for the verification code'})
 
-                cursor = conn.cursor()
+                # Rate limiting: max 5 requests per hour per target + IP, 30s minimum cooldown
+                otp_send_key = f"otp_send:{ip_addr}:{target}"
+                allowed, retry_sec = limiter.check(otp_send_key, max_requests=5, window_seconds=3600)
+                if not allowed:
+                    return self.send_json(429, {'error': f'Rate limit exceeded. Please wait {retry_sec} seconds before requesting another code.'})
 
-                # Rate limiting: minimum 30 seconds cooldown between requests
+                cursor = conn.cursor()
                 cursor.execute("""
                     SELECT created_at FROM verification_otps 
                     WHERE target = ? AND target_type = ? 
@@ -600,7 +614,7 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 # Generate secure 6-digit OTP and challenge ID
                 otp_code = generate_secure_otp()
                 challenge_id = secrets.token_hex(16)
-                otp_h = hash_otp(otp_code)
+                otp_h = hash_otp(otp_code, challenge_id)
                 expires_at = (datetime.now() + timedelta(minutes=10)).isoformat()
 
                 cursor.execute("""
@@ -610,8 +624,8 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
 
                 # Real notification dispatch (SMTP or SMS gateway)
                 dispatch_res = dispatch_verification_code(target, otp_type, otp_code, user_name)
-                msg_body = f"Your Siri Sofa Services verification code is {otp_code}. Valid for 10 minutes."
                 status_str = 'delivered' if dispatch_res['delivered'] else 'simulated_logged'
+                msg_body = f"Verification code dispatched via {otp_type}. Status: {status_str}. Provider: {dispatch_res['provider']}. Delivery ID: {dispatch_res.get('delivery_id', 'none')}"
 
                 cursor.execute("""
                     INSERT INTO notifications_log (recipient, channel, message, status, created_at)
@@ -619,7 +633,7 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 """, (target, otp_type, msg_body, status_str, now))
                 conn.commit()
 
-                # Security: never return otp_code in payload
+                # Security: never return otp_code in payload; return challenge_id and metadata only
                 return self.send_json(200, {
                     'success': True,
                     'challenge_id': challenge_id,
@@ -637,7 +651,6 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 target = payload.get('target', '').strip()
                 otp_type = payload.get('type', 'mobile').strip().lower()
                 otp_code = payload.get('otp_code', '').strip()
-                user_id = payload.get('user_id')
 
                 if not otp_code:
                     return self.send_json(400, {'error': '6-digit verification code is required'})
@@ -651,12 +664,13 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     """, (challenge_id,))
                 else:
                     if not target:
-                        return self.send_json(400, {'error': 'Challenge ID or Target is required'})
+                        return self.send_json(400, {'error': 'Challenge ID is required'})
                     cursor.execute("""
                         SELECT * FROM verification_otps 
                         WHERE target = ? AND target_type = ? AND is_used = 0 
                         ORDER BY id DESC LIMIT 1
                     """, (target, otp_type))
+
                 record = cursor.fetchone()
 
                 if not record:
@@ -668,10 +682,11 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 if record['attempts'] >= 5:
                     return self.send_json(400, {'error': 'Maximum verification attempts exceeded. Please request a new code.'})
 
+                c_id = record['challenge_id'] or 'default_challenge'
                 is_valid = False
                 if record['otp_hash']:
-                    is_valid = verify_otp_hash(otp_code, record['otp_hash'])
-                elif record['otp_code']:
+                    is_valid = verify_otp_hash(otp_code, c_id, record['otp_hash'])
+                elif record['otp_code'] and record['otp_code'] != 'HASHED':
                     is_valid = hmac.compare_digest(record['otp_code'], otp_code)
 
                 if not is_valid:
@@ -680,13 +695,13 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     remaining = 4 - record['attempts']
                     return self.send_json(400, {'error': f'Incorrect code. {max(0, remaining)} attempts remaining.'})
 
-                # Successful verification
+                # Successful verification: mark challenge as used
                 cursor.execute("UPDATE verification_otps SET is_used = 1 WHERE id = ?", (record['id'],))
 
-                # Determine which user to mark verified
+                # Determine which user to mark verified strictly from the challenge record (anti-tamper)
                 v_target = record['target']
                 v_type = record['target_type']
-                target_user_id = record['user_id'] or user_id
+                target_user_id = record['user_id']
 
                 if target_user_id:
                     if v_type == 'mobile':
@@ -764,113 +779,141 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 if not name or not phone or not service_date or not service_slot or not items:
                     return self.send_json(400, {'error': 'Missing required booking details'})
 
-                # Atomic Slot Capacity Check: prevent double booking race condition
-                cursor.execute("""
-                    SELECT COUNT(*) as count 
-                    FROM bookings 
-                    WHERE service_date = ? AND service_slot = ? AND status != 'cancelled'
-                """, (service_date, service_slot))
-                slot_occupancy = cursor.fetchone()['count']
-                if slot_occupancy >= 3:
-                    return self.send_json(409, {
-                        'error': f'The selected slot ({service_slot}) on {service_date} is fully booked. Please choose another time slot.'
-                    })
+                # Atomic Slot Capacity Check & Reservation using BEGIN IMMEDIATE transaction
+                conn.isolation_level = None
+                cursor = conn.cursor()
+                try:
+                    cursor.execute("BEGIN IMMEDIATE")
 
-                # Get pricing config
-                cursor.execute("SELECT * FROM pricing_config WHERE id = 1")
-                cfg = dict(cursor.fetchone())
-                service_charge = cfg['service_charge']
-                gst_pct = cfg['gst_percentage']
-
-                # Compute subtotal from verified database prices
-                subtotal = 0.0
-                computed_items = []
-                for it in items:
-                    variant_id = it.get('variant_id')
-                    qty = int(it.get('quantity', 1))
-                    if qty <= 0:
-                        continue
                     cursor.execute("""
-                        SELECT sv.*, s.title as service_title 
-                        FROM service_variants sv 
-                        JOIN services s ON sv.service_id = s.id 
-                        WHERE sv.id = ?
-                    """, (variant_id,))
-                    v_row = cursor.fetchone()
-                    if v_row:
-                        item_total = v_row['base_price'] * qty
-                        subtotal += item_total
-                        computed_items.append({
-                            'service_name': v_row['service_title'],
-                            'variant_name': v_row['name'],
-                            'quantity': qty,
-                            'unit_price': v_row['base_price'],
-                            'total_price': item_total
+                        SELECT slot_number FROM slot_reservations
+                        WHERE service_date = ? AND service_slot = ?
+                        ORDER BY slot_number ASC
+                    """, (service_date, service_slot))
+                    occupied_slots = {r[0] for r in cursor.fetchall()}
+
+                    cursor.execute("""
+                        SELECT COUNT(*) FROM bookings
+                        WHERE service_date = ? AND service_slot = ? AND status != 'cancelled'
+                    """, (service_date, service_slot))
+                    bookings_count = cursor.fetchone()[0]
+
+                    assigned_slot_num = None
+                    for s_num in (1, 2, 3):
+                        if s_num not in occupied_slots:
+                            assigned_slot_num = s_num
+                            break
+
+                    if not assigned_slot_num or bookings_count >= 3:
+                        cursor.execute("ROLLBACK")
+                        return self.send_json(409, {
+                            'error': f'The selected slot ({service_slot}) on {service_date} is fully booked. Please choose another time slot.'
                         })
 
-                if not computed_items:
-                    return self.send_json(400, {'error': 'No valid services selected'})
+                    # Get pricing config
+                    cursor.execute("SELECT * FROM pricing_config WHERE id = 1")
+                    cfg = dict(cursor.fetchone())
+                    service_charge = cfg['service_charge']
+                    gst_pct = cfg['gst_percentage']
 
-                # Discount
-                discount = 0.0
-                if coupon_code:
-                    cursor.execute("SELECT * FROM coupons WHERE UPPER(code) = ? AND is_active = 1", (coupon_code,))
-                    c_row = cursor.fetchone()
-                    if c_row and subtotal >= c_row['min_order_amount']:
-                        if c_row['discount_type'] == 'fixed':
-                            discount = min(c_row['value'], subtotal)
-                        else:
-                            discount = round((subtotal * c_row['value']) / 100.0, 2)
+                    # Compute subtotal from verified database prices
+                    subtotal = 0.0
+                    computed_items = []
+                    for it in items:
+                        variant_id = it.get('variant_id')
+                        qty = int(it.get('quantity', 1))
+                        if qty <= 0:
+                            continue
+                        cursor.execute("""
+                            SELECT sv.*, s.title as service_title 
+                            FROM service_variants sv 
+                            JOIN services s ON sv.service_id = s.id 
+                            WHERE sv.id = ?
+                        """, (variant_id,))
+                        v_row = cursor.fetchone()
+                        if v_row:
+                            item_total = v_row['base_price'] * qty
+                            subtotal += item_total
+                            computed_items.append({
+                                'service_name': v_row['service_title'],
+                                'variant_name': v_row['name'],
+                                'quantity': qty,
+                                'unit_price': v_row['base_price'],
+                                'total_price': item_total
+                            })
 
-                taxable_amount = max(0.0, subtotal - discount + service_charge)
-                tax = round((taxable_amount * (gst_pct / 100.0)), 2)
-                total_amount = round(taxable_amount + tax, 2)
+                    if not computed_items:
+                        cursor.execute("ROLLBACK")
+                        return self.send_json(400, {'error': 'No valid services selected'})
 
-                # Generate cryptographically secure booking ID
-                booking_id = generate_booking_id(conn)
+                    # Discount
+                    discount = 0.0
+                    if coupon_code:
+                        cursor.execute("SELECT * FROM coupons WHERE UPPER(code) = ? AND is_active = 1", (coupon_code,))
+                        c_row = cursor.fetchone()
+                        if c_row and subtotal >= c_row['min_order_amount']:
+                            if c_row['discount_type'] == 'fixed':
+                                discount = min(c_row['value'], subtotal)
+                            else:
+                                discount = round((subtotal * c_row['value']) / 100.0, 2)
 
-                cursor.execute("""
-                    INSERT INTO bookings (
-                        id, user_id, customer_name, customer_email, customer_phone, address_json,
-                        service_date, service_slot, status, subtotal, service_charge, tax, discount,
-                        coupon_code, total_amount, notes, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'received', ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    booking_id, user_id, name, email, phone, json.dumps(address_data),
-                    service_date, service_slot, subtotal, service_charge, tax, discount,
-                    coupon_code, total_amount, notes, now, now
-                ))
+                    taxable_amount = max(0.0, subtotal - discount + service_charge)
+                    tax = round((taxable_amount * (gst_pct / 100.0)), 2)
+                    total_amount = round(taxable_amount + tax, 2)
 
-                for ci in computed_items:
+                    # Generate cryptographically secure booking ID
+                    booking_id = generate_booking_id(conn)
+
                     cursor.execute("""
-                        INSERT INTO booking_items (booking_id, service_name, variant_name, quantity, unit_price, total_price)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    """, (booking_id, ci['service_name'], ci['variant_name'], ci['quantity'], ci['unit_price'], ci['total_price']))
-
-                # Save address for authenticated user
-                if address_data.get('house_flat'):
-                    cursor.execute("""
-                        INSERT INTO addresses (user_id, house_flat, street, area, city, pincode, instructions, is_default)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+                        INSERT INTO bookings (
+                            id, user_id, customer_name, customer_email, customer_phone, address_json,
+                            service_date, service_slot, status, subtotal, service_charge, tax, discount,
+                            coupon_code, total_amount, notes, created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'received', ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
-                        user_id,
-                        address_data.get('house_flat', ''),
-                        address_data.get('street', ''),
-                        address_data.get('area', ''),
-                        address_data.get('city', ''),
-                        address_data.get('pincode', ''),
-                        notes
+                        booking_id, user_id, name, email, phone, json.dumps(address_data),
+                        service_date, service_slot, subtotal, service_charge, tax, discount,
+                        coupon_code, total_amount, notes, now, now
                     ))
 
-                conn.commit()
+                    cursor.execute("""
+                        INSERT INTO slot_reservations (service_date, service_slot, slot_number, booking_id, created_at)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (service_date, service_slot, assigned_slot_num, booking_id, now))
 
-                return self.send_json(201, {
-                    'message': 'Booking confirmed successfully',
-                    'booking_id': booking_id,
-                    'total_amount': total_amount,
-                    'service_date': service_date,
-                    'service_slot': service_slot
-                })
+                    for ci in computed_items:
+                        cursor.execute("""
+                            INSERT INTO booking_items (booking_id, service_name, variant_name, quantity, unit_price, total_price)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        """, (booking_id, ci['service_name'], ci['variant_name'], ci['quantity'], ci['unit_price'], ci['total_price']))
+
+                    # Save address for authenticated user
+                    if address_data.get('house_flat'):
+                        cursor.execute("""
+                            INSERT INTO addresses (user_id, house_flat, street, area, city, pincode, instructions, is_default)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+                        """, (
+                            user_id,
+                            address_data.get('house_flat', ''),
+                            address_data.get('street', ''),
+                            address_data.get('area', ''),
+                            address_data.get('city', 'Hyderabad'),
+                            address_data.get('pincode', ''),
+                            address_data.get('instructions', '')
+                        ))
+
+                    cursor.execute("COMMIT")
+
+                    return self.send_json(201, {
+                        'message': 'Booking confirmed successfully',
+                        'booking_id': booking_id,
+                        'total_amount': total_amount,
+                        'service_date': service_date,
+                        'service_slot': service_slot
+                    })
+                except Exception as b_err:
+                    cursor.execute("ROLLBACK")
+                    raise b_err
 
             # POST /api/reviews (Authenticated, completed booking, and anti-tamper)
             elif path == '/api/reviews':
@@ -967,6 +1010,8 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
 
                 cursor = conn.cursor()
                 cursor.execute("UPDATE bookings SET status = ?, updated_at = ? WHERE id = ?", (new_status, now, booking_id))
+                if new_status == 'cancelled':
+                    cursor.execute("DELETE FROM slot_reservations WHERE booking_id = ?", (booking_id,))
                 conn.commit()
                 return self.send_json(200, {'message': f'Booking {booking_id} status updated to {new_status}'})
 

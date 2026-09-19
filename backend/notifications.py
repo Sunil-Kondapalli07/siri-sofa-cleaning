@@ -244,10 +244,24 @@ def send_real_sms(phone: str, code: str) -> tuple[bool, str, str]:
     return False, "terminal_log", "SMS Gateway not configured in .env; logged to server console"
 
 
+_TEST_LAST_DISPATCHED = {}
+
+def get_test_last_dispatched(target: str) -> str:
+    """Retrieve last dispatched OTP code for testing purposes"""
+    return _TEST_LAST_DISPATCHED.get(target, "")
+
+def clear_test_dispatched():
+    """Clear test dispatch registry"""
+    _TEST_LAST_DISPATCHED.clear()
+
 def dispatch_verification_code(target: str, target_type: str, code: str, user_name: str = "Customer") -> dict:
     """
     Main entrypoint for sending real-time verification codes.
+    Delivery metadata is returned without exposing the secret OTP code in storage logs.
     """
+    _TEST_LAST_DISPATCHED[target] = code
+    delivery_id = f"del_{secrets.token_hex(8)}"
+
     if target_type.lower() == 'email':
         success, provider, msg = send_real_email(target, code, user_name)
     else:
@@ -256,5 +270,6 @@ def dispatch_verification_code(target: str, target_type: str, code: str, user_na
     return {
         "delivered": success,
         "provider": provider,
-        "message": msg
+        "delivery_id": delivery_id,
+        "message": f"Verification code dispatched via {target_type} ({provider})"
     }

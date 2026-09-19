@@ -31,14 +31,24 @@ def verify_password(password: str, stored_hash: str) -> bool:
     legacy_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
     return hmac.compare_digest(legacy_hash, stored_hash)
 
-def hash_otp(otp_code: str, salt: str = "siri_otp_salt_2026") -> str:
-    """Hash one-time passcode with salt before saving to database"""
-    return hashlib.sha256(f"{salt}:{otp_code.strip()}".encode('utf-8')).hexdigest()
+SECRET_KEY = os.environ.get('SECRET_KEY', 'siri-sofa-sec-prod-hyderabad-2026')
 
-def verify_otp_hash(otp_code: str, stored_hash: str, salt: str = "siri_otp_salt_2026") -> bool:
-    """Constant-time comparison for OTP verification"""
-    candidate = hash_otp(otp_code, salt)
-    return hmac.compare_digest(candidate, stored_hash)
+def hash_otp(otp_code: str, challenge_id: str = "default_challenge") -> str:
+    """HMAC-SHA256 with server-secret key and challenge-specific salt"""
+    key = SECRET_KEY.encode('utf-8')
+    msg = f"{challenge_id}:{otp_code.strip()}".encode('utf-8')
+    return hmac.new(key, msg, hashlib.sha256).hexdigest()
+
+def verify_otp_hash(otp_code: str, challenge_id: str, stored_hash: str) -> bool:
+    """Constant-time comparison for challenge-bound OTP verification"""
+    if not stored_hash:
+        return False
+    candidate = hash_otp(otp_code, challenge_id)
+    if hmac.compare_digest(candidate, stored_hash):
+        return True
+    # Legacy fallback for backward compatibility
+    legacy_candidate = hashlib.sha256(f"siri_otp_salt_2026:{otp_code.strip()}".encode('utf-8')).hexdigest()
+    return hmac.compare_digest(legacy_candidate, stored_hash)
 
 def get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
@@ -204,6 +214,15 @@ def init_db(db_path: str = DB_PATH):
         service_type TEXT NOT NULL,
         created_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS slot_reservations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        service_date TEXT NOT NULL,
+        service_slot TEXT NOT NULL,
+        slot_number INTEGER NOT NULL CHECK (slot_number >= 1 AND slot_number <= 3),
+        booking_id TEXT NOT NULL UNIQUE,
+        created_at TEXT NOT NULL,
+        UNIQUE(service_date, service_slot, slot_number)
+    );
     """)
     # Migrations for existing DB instances
     try:
@@ -226,6 +245,10 @@ def init_db(db_path: str = DB_PATH):
         cursor.execute("ALTER TABLE verification_otps ADD COLUMN user_id INTEGER")
     except Exception:
         pass
+    try:
+        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_reviews_booking_id ON reviews(booking_id)")
+    except Exception:
+        pass
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS user_sessions (
@@ -237,6 +260,17 @@ def init_db(db_path: str = DB_PATH):
         ip_address TEXT,
         user_agent TEXT,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS slot_reservations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        service_date TEXT NOT NULL,
+        service_slot TEXT NOT NULL,
+        slot_number INTEGER NOT NULL CHECK (slot_number >= 1 AND slot_number <= 3),
+        booking_id TEXT NOT NULL UNIQUE,
+        created_at TEXT NOT NULL,
+        UNIQUE(service_date, service_slot, slot_number)
     );
     """)
 
