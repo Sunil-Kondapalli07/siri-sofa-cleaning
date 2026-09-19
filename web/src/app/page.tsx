@@ -5,6 +5,7 @@ import { Service, ServiceVariant, CartItem, User } from "@/types";
 import { api } from "@/lib/api";
 import { Navbar } from "@/components/Navbar";
 import { Hero } from "@/components/Hero";
+import { EmotionalStory } from "@/components/EmotionalStory";
 import { BeforeAfterSlider } from "@/components/BeforeAfterSlider";
 import { ServiceSelector } from "@/components/ServiceSelector";
 import { HygieneProcess } from "@/components/HygieneProcess";
@@ -33,7 +34,7 @@ export default function Home() {
   const [trackingId, setTrackingId] = useState<string>("");
 
   useEffect(() => {
-    // 1. Fetch initial services and pricing
+    // 1. Fetch initial services and pricing from Python backend proxy
     api.getServices().then((svcs) => {
       if (svcs && svcs.length > 0) setServices(svcs);
     });
@@ -84,7 +85,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAF9F6]">
+    <div className="min-h-screen flex flex-col bg-[#FAF9F6] selection:bg-[#0C4A34] selection:text-white">
       {/* Navigation Bar */}
       <Navbar
         user={user}
@@ -97,7 +98,7 @@ export default function Home() {
 
       {/* Main Content Sections */}
       <main className="flex-1">
-        {/* Editorial Luxury Hero */}
+        {/* 1. Cinematic Luxury Penthouse Hero */}
         <Hero
           onBookNow={() => setIsBookingOpen(true)}
           onExploreServices={() => {
@@ -105,10 +106,15 @@ export default function Home() {
           }}
         />
 
-        {/* Interactive Before & After Comparison Slider */}
+        {/* 2. Emotional Story: The Heart of the Home */}
+        <EmotionalStory
+          onBookNow={() => setIsBookingOpen(true)}
+        />
+
+        {/* 3. Interactive Before & After Comparison Slider */}
         <BeforeAfterSlider />
 
-        {/* Interactive Dynamic Services Catalog & Customizer */}
+        {/* 4. Interactive Dynamic Services Catalog & Customizer */}
         <ServiceSelector
           services={services}
           cart={cart}
@@ -117,17 +123,17 @@ export default function Home() {
           onProceedToBooking={() => setIsBookingOpen(true)}
         />
 
-        {/* 6-Step Hospital-Grade Hygiene Process */}
+        {/* 5. 6-Step Clinical Hygiene Protocol */}
         <HygieneProcess />
 
-        {/* How It Works & Why Choose Siri */}
+        {/* 6. How It Works & Why Choose Siri */}
         <Features />
 
-        {/* Customer Reviews & Accordion FAQs */}
+        {/* 7. Verified Customer Reviews & Accordion FAQs */}
         <ReviewsFaq />
       </main>
 
-      {/* Footer */}
+      {/* Global Footer */}
       <Footer
         onOpenAdmin={() => setIsAdminOpen(true)}
         onOpenTracking={() => setIsTrackerOpen(true)}
