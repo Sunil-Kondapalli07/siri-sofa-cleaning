@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Service, ServiceVariant, CartItem, AvailableSlot, User } from "@/types";
 import { api } from "@/lib/api";
-import { X, Check, ArrowRight, ArrowLeft, Calendar, MapPin, Tag, Sparkles, AlertCircle } from "lucide-react";
+import { X, Check, ArrowRight, ArrowLeft, Calendar, MapPin, Tag, Sparkles, AlertCircle, Lock, ShieldCheck, User as UserIcon } from "lucide-react";
 
 interface BookingWizardModalProps {
   isOpen: boolean;
@@ -13,6 +13,8 @@ interface BookingWizardModalProps {
   pricingConfig: { service_charge: number; gst_percentage: number };
   user: User | null;
   onBookingSuccess: (bookingId: string) => void;
+  onOpenAuth?: () => void;
+  onOpenTrackingWithId?: (bookingId: string) => void;
 }
 
 export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
@@ -23,11 +25,14 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   pricingConfig,
   user,
   onBookingSuccess,
+  onOpenAuth,
+  onOpenTrackingWithId,
 }) => {
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [houseFlat, setHouseFlat] = useState("");
   const [street, setStreet] = useState("");
   const [area, setArea] = useState("Banjara Hills");
@@ -67,7 +72,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
         setSlots(fetchedSlots);
         setLoadingSlots(false);
         const firstAvailable = fetchedSlots.find((s) => s.available);
-        if (firstAvailable && !serviceSlot) {
+        if (firstAvailable && (!serviceSlot || !fetchedSlots.find(s => s.slot === serviceSlot && s.available))) {
           setServiceSlot(firstAvailable.slot);
         }
       });
@@ -92,15 +97,43 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
         setCouponDiscount(res.discount);
         setCouponApplied(true);
       } else {
-        setCouponError(res.message || "Invalid coupon code");
+        setCouponError(res.error || "Invalid coupon code");
       }
     } catch {
       setCouponError("Could not validate coupon");
     }
   };
 
+  const handleStep2Continue = async () => {
+    setSubmitError("");
+    // If not logged in but provided password, attempt instant registration or login
+    if (!user && password.length >= 6 && email && name && phone) {
+      try {
+        const regRes = await api.register({
+          name: name.trim(),
+          phone: phone.trim(),
+          email: email.trim().toLowerCase(),
+          password,
+        });
+        if (regRes.token) {
+          // Success
+        }
+      } catch {}
+    }
+    setStep(3);
+  };
+
   const handleSubmitBooking = async () => {
     if (isSubmitting) return;
+
+    // Check authentication
+    const token = localStorage.getItem("siri_auth_token") || localStorage.getItem("siri_token");
+    if (!token && !user) {
+      setSubmitError("Please sign in or create an account to schedule your appointment.");
+      if (onOpenAuth) onOpenAuth();
+      return;
+    }
+
     setSubmitError("");
     setIsSubmitting(true);
 
@@ -110,7 +143,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
         phone,
         email,
         service_date: serviceDate,
-        service_slot: serviceSlot || (slots[0] ? slots[0].slot : "09:00 AM"),
+        service_slot: serviceSlot || (slots.find(s => s.available)?.slot || "09:00 AM"),
         items: cart.map((it) => ({
           variant_id: it.variant.id,
           quantity: it.quantity,
@@ -132,7 +165,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
         setCompletedBookingId(res.booking_id);
         onBookingSuccess(res.booking_id);
       } else {
-        setSubmitError(res.error || "Failed to schedule booking. Please try again.");
+        setSubmitError(res.error || "Failed to schedule booking. Please check details and try again.");
       }
     } catch (err: unknown) {
       setSubmitError(err instanceof Error ? err.message : "Booking submission error");
@@ -180,32 +213,47 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
           {completedBookingId ? (
             /* Booking Confirmation Screen */
             <div className="text-center py-6 space-y-4">
-              <div className="w-16 h-16 rounded-full bg-emerald-100 text-[#0C4A34] mx-auto flex items-center justify-center text-3xl font-black">
+              <div className="w-16 h-16 rounded-full bg-emerald-100 text-[#0C4A34] mx-auto flex items-center justify-center text-3xl font-black shadow-inner">
                 ✓
               </div>
               <h4 className="text-2xl font-black text-[#121820]">
                 Cleaning Scheduled!
               </h4>
               <p className="text-xs sm:text-sm text-[#525D6C] max-w-md mx-auto leading-relaxed">
-                Your technician dispatch has been created in our system. You will receive real-time updates and technician GPS tracking.
+                Your appointment has been registered in our Hyderabad dispatch queue. You will receive real-time updates and technician route tracking.
               </p>
 
-              <div className="bg-[#FAF9F6] p-4 rounded-2xl border border-black/8 max-w-sm mx-auto text-left space-y-2 mt-4">
+              <div className="bg-[#FAF9F6] p-5 rounded-2xl border border-black/8 max-w-md mx-auto text-left space-y-2.5 mt-4">
                 <div className="flex justify-between text-xs font-semibold text-[#525D6C]">
                   <span>Booking Reference:</span>
-                  <span className="font-mono font-bold text-[#0C4A34]">{completedBookingId}</span>
+                  <span className="font-mono font-black text-[#0C4A34] text-sm">{completedBookingId}</span>
                 </div>
                 <div className="flex justify-between text-xs font-semibold text-[#525D6C]">
                   <span>Date & Slot:</span>
                   <span className="font-bold text-[#121820]">{serviceDate} • {serviceSlot}</span>
                 </div>
                 <div className="flex justify-between text-xs font-semibold text-[#525D6C]">
-                  <span>Total Amount:</span>
-                  <span className="font-bold text-[#121820]">₹{total} (Pay post-clean)</span>
+                  <span>Service Address:</span>
+                  <span className="font-bold text-[#121820] text-right">{houseFlat}, {area}</span>
+                </div>
+                <div className="flex justify-between text-xs font-semibold text-[#525D6C] pt-2 border-t border-black/8">
+                  <span>Total Amount (Pay After Inspection):</span>
+                  <span className="font-black text-base text-[#0C4A34]">₹{total}</span>
                 </div>
               </div>
 
-              <div className="pt-4">
+              <div className="pt-4 flex items-center justify-center gap-3">
+                {onOpenTrackingWithId && (
+                  <button
+                    onClick={() => {
+                      onClose();
+                      onOpenTrackingWithId(completedBookingId);
+                    }}
+                    className="btn-secondary text-xs py-3 px-6"
+                  >
+                    Track Appointment
+                  </button>
+                )}
                 <button
                   onClick={onClose}
                   className="btn-primary text-xs py-3 px-8"
@@ -238,23 +286,51 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                               ₹{it.variant.base_price} × {it.quantity}
                             </div>
                           </div>
-                          <div className="font-black text-sm text-[#0C4A34]">
+                          <div className="font-bold text-sm text-[#0C4A34]">
                             ₹{it.variant.base_price * it.quantity}
                           </div>
                         </div>
                       ))}
-                      <div className="pt-4 border-t border-black/5 flex justify-between font-bold text-base">
-                        <span>Items Subtotal:</span>
-                        <span className="text-[#0C4A34]">₹{subtotal}</span>
+
+                      <div className="border-t border-black/8 pt-3 flex justify-between text-sm font-bold text-[#121820]">
+                        <span>Subtotal ({cart.reduce((s, i) => s + i.quantity, 0)} items):</span>
+                        <span>₹{subtotal}</span>
                       </div>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Step 2: Contact Info */}
+              {/* Step 2: Contact & Identification */}
               {step === 2 && (
                 <div className="space-y-4">
+                  {user ? (
+                    <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs text-left mb-2">
+                      <div className="flex items-center gap-2">
+                        <Check className="w-4 h-4 text-emerald-600 font-bold" />
+                        <span className="text-emerald-950 font-bold">
+                          Authenticated as: <strong>{user.name}</strong> ({user.phone || user.email})
+                        </span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px] uppercase">
+                        Verified
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs mb-2">
+                      <span className="text-slate-600 font-medium">Already have an account?</span>
+                      {onOpenAuth && (
+                        <button
+                          type="button"
+                          onClick={onOpenAuth}
+                          className="px-3 py-1 rounded-lg bg-[#0C4A34] text-white text-xs font-bold hover:bg-[#083324] transition-all"
+                        >
+                          Sign In Here
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-xs font-bold text-[#121820] mb-1.5">
                       Full Name *
@@ -263,7 +339,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                       type="text"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g. Sunil Kumar"
+                      placeholder="e.g. Ramesh Reddy"
                       className="w-full px-4 py-3 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34]"
                       required
                     />
@@ -277,7 +353,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                       type="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder="e.g. 9876543210"
+                      placeholder="e.g. 98480 99887"
                       className="w-full px-4 py-3 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34]"
                       required
                     />
@@ -291,11 +367,26 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="e.g. sunil@example.com"
+                      placeholder="e.g. ramesh@example.com"
                       className="w-full px-4 py-3 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34]"
                       required
                     />
                   </div>
+
+                  {!user && (
+                    <div>
+                      <label className="block text-xs font-bold text-[#121820] mb-1.5">
+                        Create Password (min 6 chars) <span className="text-[#8490A0] font-normal">(optional — secures your booking)</span>
+                      </label>
+                      <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full px-4 py-3 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34]"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -371,52 +462,54 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
 
                   <div>
                     <label className="block text-xs font-bold text-[#121820] mb-1.5">
-                      Special Cleaning Instructions (Optional)
+                      Special Instructions for Technician (Optional)
                     </label>
                     <textarea
                       value={instructions}
                       onChange={(e) => setInstructions(e.target.value)}
-                      placeholder="e.g. Please focus on deep chocolate/coffee stain on right armrest"
                       rows={2}
+                      placeholder="e.g. Please call before reaching; pet at home."
                       className="w-full px-4 py-3 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34]"
                     />
                   </div>
                 </div>
               )}
 
-              {/* Step 4: Date & Slot Picker */}
+              {/* Step 4: Date & Slot Selection */}
               {step === 4 && (
-                <div className="space-y-5">
+                <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-bold text-[#121820] mb-1.5">
-                      Select Service Date *
+                      Service Date (Next 7 Days) *
                     </label>
                     <input
                       type="date"
                       value={serviceDate}
-                      min={new Date().toISOString().split("T")[0]}
+                      min={tomorrow}
                       onChange={(e) => setServiceDate(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34] bg-white font-semibold"
+                      className="w-full px-4 py-3 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34]"
+                      required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-[#121820] mb-1.5">
-                      Available Inspection Slots (Max 3 Bookings / Slot) *
+                    <label className="block text-xs font-bold text-[#121820] mb-2">
+                      Available Inspection Slots for {serviceDate} (Max 3 Homes/Slot) *
                     </label>
+
                     {loadingSlots ? (
                       <div className="text-center py-6 text-xs text-[#8490A0]">
-                        Checking real-time slot availability...
+                        Checking real-time technician availability...
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {slots.map((s, idx) => {
+                      <div className="grid grid-cols-2 gap-2.5">
+                        {slots.map((s) => {
                           const isSelected = serviceSlot === s.slot;
                           return (
                             <div
-                              key={idx}
+                              key={s.slot}
                               onClick={() => s.available && setServiceSlot(s.slot)}
-                              className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all ${
+                              className={`p-3 rounded-xl border transition-all cursor-pointer ${
                                 !s.available
                                   ? "opacity-40 bg-gray-100 cursor-not-allowed border-gray-200"
                                   : isSelected
@@ -450,6 +543,42 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
               {/* Step 5: Review & Price Breakdown */}
               {step === 5 && (
                 <div className="space-y-5">
+                  {/* Auth Verification Banner on Review Step */}
+                  {user ? (
+                    <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs text-left">
+                      <div className="flex items-center gap-2">
+                        <Check className="w-4 h-4 text-emerald-600 font-bold" />
+                        <span className="text-emerald-950 font-bold">
+                          Authenticated as: <strong>{user.name}</strong> ({user.phone || user.email})
+                        </span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px] uppercase">
+                        Ready to Schedule
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-left space-y-2">
+                      <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
+                        <Lock className="w-4 h-4 text-amber-700 shrink-0" />
+                        <span>Sign In Required to Complete Booking</span>
+                      </div>
+                      <p className="text-xs text-amber-800/90 leading-relaxed">
+                        To dispatch your verified specialist and enable live tracking, please sign in or create your account.
+                      </p>
+                      {onOpenAuth && (
+                        <div className="pt-1 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={onOpenAuth}
+                            className="px-4 py-2 rounded-xl bg-[#0C4A34] text-white font-bold text-xs hover:bg-[#083324] transition-all shadow-sm"
+                          >
+                            Sign In / Create Account (30-Sec)
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Coupon Code Input */}
                   <div className="bg-[#FAF9F6] p-4 rounded-2xl border border-black/8">
                     <label className="block text-xs font-bold text-[#121820] mb-1.5">
@@ -496,7 +625,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                       </div>
                     )}
                     <div className="flex justify-between">
-                      <span>Hospital-Grade Doorstep Service Charge</span>
+                      <span>Doorstep Sanitization & Service Charge</span>
                       <span className="font-bold text-[#121820]">₹{serviceCharge}</span>
                     </div>
                     <div className="flex justify-between">
@@ -515,7 +644,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                   </div>
 
                   {submitError && (
-                    <div className="p-3 bg-red-50 text-red-700 rounded-xl text-xs font-bold">
+                    <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-bold">
                       {submitError}
                     </div>
                   )}
@@ -540,30 +669,77 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
               <div />
             )}
 
-            {step < 5 ? (
+            {step === 1 && (
               <button
-                onClick={() => setStep(step + 1)}
-                disabled={step === 1 && cart.length === 0}
+                onClick={() => setStep(2)}
+                disabled={cart.length === 0}
                 className="btn-primary text-xs py-2.5 px-6 disabled:opacity-40"
               >
                 <span>Continue</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
-            ) : (
+            )}
+
+            {step === 2 && (
               <button
-                onClick={handleSubmitBooking}
-                disabled={isSubmitting}
-                className="btn-primary text-xs py-3 px-8 shadow-xl bg-emerald-700 hover:bg-emerald-600"
+                onClick={handleStep2Continue}
+                disabled={!name || !phone || !email}
+                className="btn-primary text-xs py-2.5 px-6 disabled:opacity-40"
               >
-                {isSubmitting ? (
-                  <span>Scheduling Booking...</span>
-                ) : (
-                  <>
-                    <span>Confirm & Schedule</span>
-                    <Check className="w-4 h-4" />
-                  </>
-                )}
+                <span>Continue to Address</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
+            )}
+
+            {step === 3 && (
+              <button
+                onClick={() => setStep(4)}
+                disabled={!houseFlat || !street || !pincode}
+                className="btn-primary text-xs py-2.5 px-6 disabled:opacity-40"
+              >
+                <span>Continue to Slot</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            {step === 4 && (
+              <button
+                onClick={() => setStep(5)}
+                disabled={!serviceDate || !serviceSlot}
+                className="btn-primary text-xs py-2.5 px-6 disabled:opacity-40"
+              >
+                <span>Review Appointment</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            {step === 5 && (
+              user ? (
+                <button
+                  onClick={handleSubmitBooking}
+                  disabled={isSubmitting}
+                  className="btn-primary text-xs py-3 px-8 shadow-xl bg-emerald-700 hover:bg-emerald-600"
+                >
+                  {isSubmitting ? (
+                    <span>Scheduling Booking...</span>
+                  ) : (
+                    <>
+                      <span>Confirm & Schedule</span>
+                      <Check className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    if (onOpenAuth) onOpenAuth();
+                  }}
+                  className="btn-primary text-xs py-3 px-8 shadow-xl bg-[#0C4A34] hover:bg-[#083324] flex items-center gap-2"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>Sign In to Confirm Booking</span>
+                </button>
+              )
             )}
           </div>
         )}

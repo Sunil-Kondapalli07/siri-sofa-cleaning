@@ -41,7 +41,9 @@ export default function Home() {
     });
 
     // 2. Check existing session
-    const savedUser = localStorage.getItem("siri_user_profile");
+    const savedUser =
+      localStorage.getItem("siri_user_profile") ||
+      localStorage.getItem("siri_user");
     if (savedUser) {
       try {
         setUser(JSON.parse(savedUser));
@@ -69,12 +71,12 @@ export default function Home() {
   const handleLoginSuccess = (loggedInUser: User) => {
     setUser(loggedInUser);
     localStorage.setItem("siri_user_profile", JSON.stringify(loggedInUser));
+    localStorage.setItem("siri_user", JSON.stringify(loggedInUser));
   };
 
   const handleLogout = () => {
     setUser(null);
-    localStorage.removeItem("siri_auth_token");
-    localStorage.removeItem("siri_user_profile");
+    api.logout();
   };
 
   const handleBookingSuccess = (bookingId: string) => {
@@ -136,6 +138,11 @@ export default function Home() {
         pricingConfig={pricingConfig}
         user={user}
         onBookingSuccess={handleBookingSuccess}
+        onOpenAuth={() => setIsAuthOpen(true)}
+        onOpenTrackingWithId={(id) => {
+          setTrackingId(id);
+          setIsTrackerOpen(true);
+        }}
       />
 
       <BookingTrackerModal

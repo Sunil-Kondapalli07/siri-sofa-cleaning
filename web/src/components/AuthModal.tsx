@@ -3,20 +3,22 @@
 import React, { useState } from "react";
 import { User } from "@/types";
 import { api } from "@/lib/api";
-import { X, Lock, Mail, Phone, User as UserIcon, ShieldCheck } from "lucide-react";
+import { X, Lock, Mail, Phone, User as UserIcon, ShieldCheck, Sparkles } from "lucide-react";
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLoginSuccess: (user: User) => void;
+  initialTab?: "login" | "register";
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
   onClose,
   onLoginSuccess,
+  initialTab = "login",
 }) => {
-  const [tab, setTab] = useState<"login" | "register">("login");
+  const [tab, setTab] = useState<"login" | "register">(initialTab);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -30,6 +32,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [emailChallenge, setEmailChallenge] = useState("");
   const [mobileOtp, setMobileOtp] = useState("");
   const [emailOtp, setEmailOtp] = useState("");
+  const [devOtpHint, setDevOtpHint] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -39,16 +42,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setLoading(true);
 
     try {
-      const res = await api.login(email.trim().toLowerCase(), password);
+      const res = await api.login(email.trim(), password);
       if (res.token && res.user) {
-        localStorage.setItem("siri_auth_token", res.token);
         onLoginSuccess(res.user);
         onClose();
       } else {
-        setError(res.error || "Invalid email or password");
+        setError(res.error || "Invalid email, mobile number, or password");
       }
     } catch {
-      setError("Network or authentication failure");
+      setError("Network or authentication failure. Please check your connection.");
     } finally {
       setLoading(false);
     }
@@ -67,21 +69,32 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         password,
       });
 
+      if (res.error) {
+        setError(res.error);
+        setLoading(false);
+        return;
+      }
+
       if (res.token && res.user) {
-        localStorage.setItem("siri_auth_token", res.token);
         if (res.requires_verification) {
           setRequiresOtp(true);
           setMobileChallenge(res.mobile_challenge_id || "");
           setEmailChallenge(res.email_challenge_id || "");
+          const hint = res.dev_mobile_otp || res.dev_email_otp || res.dev_otp_hint;
+          if (hint) {
+            setDevOtpHint(hint);
+            setMobileOtp(res.dev_mobile_otp || hint);
+            setEmailOtp(res.dev_email_otp || hint);
+          }
         } else {
           onLoginSuccess(res.user);
           onClose();
         }
       } else {
-        setError(res.error || "Registration failed");
+        setError(res.error || "Registration failed. Please try again.");
       }
     } catch {
-      setError("Registration error");
+      setError("Registration network error. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -93,20 +106,39 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setLoading(true);
 
     try {
-      if (mobileChallenge && mobileOtp) {
-        await api.verifyOtp(mobileChallenge, mobileOtp);
+      const code = (mobileOtp || emailOtp).trim();
+      if (!code) {
+        setError("Please enter the 6-digit verification code");
+        setLoading(false);
+        return;
       }
-      if (emailChallenge && emailOtp) {
-        await api.verifyOtp(emailChallenge, emailOtp);
+
+      let res: { success?: boolean; error?: string } | null = null;
+      if (mobileChallenge && mobileOtp.trim()) {
+        res = await api.verifyOtp(mobileChallenge, mobileOtp.trim());
       }
-      // Reload or fetch current customer session
-      const loginRes = await api.login(email.trim().toLowerCase(), password);
+      if ((!res || res.error) && emailChallenge && emailOtp.trim()) {
+        res = await api.verifyOtp(emailChallenge, emailOtp.trim());
+      }
+      if (!res) {
+        const challenge = mobileChallenge || emailChallenge;
+        res = await api.verifyOtp(challenge, code);
+      }
+
+      if (!res || res.error) {
+        setError(res?.error || "OTP verification failed");
+        setLoading(false);
+        return;
+      }
+
+      // Automatically sign in after verification
+      const loginRes = await api.login(email.trim(), password);
       if (loginRes.user) {
         onLoginSuccess(loginRes.user);
       }
       onClose();
-    } catch {
-      setError("OTP verification failed. Please check the codes entered.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "OTP verification failed");
     } finally {
       setLoading(false);
     }
@@ -169,7 +201,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {/* Body */}
         <div className="p-6 sm:p-8 space-y-4">
           {error && (
-            <div className="p-3 bg-red-50 text-red-700 rounded-xl text-xs font-bold">
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-bold">
               {error}
             </div>
           )}
@@ -178,34 +210,43 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             /* OTP Verification Screen */
             <form onSubmit={handleVerifyOtps} className="space-y-4">
               <p className="text-xs text-[#525D6C] leading-relaxed">
-                We sent verification codes to your mobile phone and email address. Please enter either code to verify.
+                We sent verification codes to your mobile phone and email. Please enter either code below to activate your account.
               </p>
 
-              <div>
-                <label className="block text-xs font-bold text-[#121820] mb-1">
-                  Mobile SMS OTP (6 Digits)
-                </label>
-                <input
-                  type="text"
-                  maxLength={6}
-                  value={mobileOtp}
-                  onChange={(e) => setMobileOtp(e.target.value)}
-                  placeholder="e.g. 123456"
-                  className="w-full px-4 py-3 rounded-xl border border-black/15 text-sm font-mono tracking-widest text-center focus:outline-none focus:border-[#0C4A34]"
-                />
-              </div>
+              {devOtpHint && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Demo Code: <strong className="font-mono text-sm tracking-wider">{devOtpHint}</strong></span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileOtp(devOtpHint);
+                      setEmailOtp(devOtpHint);
+                    }}
+                    className="px-2.5 py-1 bg-[#0C4A34] text-white rounded-lg text-[10px] font-bold"
+                  >
+                    Auto-Fill
+                  </button>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-bold text-[#121820] mb-1">
-                  Email Verification Code
+                  6-Digit Verification Code *
                 </label>
                 <input
                   type="text"
                   maxLength={6}
-                  value={emailOtp}
-                  onChange={(e) => setEmailOtp(e.target.value)}
-                  placeholder="e.g. 654321"
-                  className="w-full px-4 py-3 rounded-xl border border-black/15 text-sm font-mono tracking-widest text-center focus:outline-none focus:border-[#0C4A34]"
+                  required
+                  value={mobileOtp || emailOtp}
+                  onChange={(e) => {
+                    setMobileOtp(e.target.value);
+                    setEmailOtp(e.target.value);
+                  }}
+                  placeholder="e.g. 123456"
+                  className="w-full px-4 py-3 rounded-xl border border-black/15 text-lg font-mono tracking-widest text-center focus:outline-none focus:border-[#0C4A34]"
                 />
               </div>
 
@@ -222,16 +263,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[#121820] mb-1">
-                  Email Address
+                  Email Address or Mobile Number *
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-[#8490A0] absolute left-3.5 top-3.5" />
                   <input
-                    type="email"
+                    type="text"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
+                    placeholder="you@example.com or 9876543210"
                     className="w-full pl-10 pr-4 py-3 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34]"
                   />
                 </div>
@@ -239,7 +280,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-[#121820] mb-1">
-                  Password
+                  Password *
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-[#8490A0] absolute left-3.5 top-3.5" />
@@ -257,93 +298,132 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="submit"
                 disabled={loading}
-                className="btn-primary w-full text-xs py-3.5 mt-2 shadow-md"
+                className="btn-primary w-full text-xs py-3.5 mt-2"
               >
-                {loading ? "Signing in..." : "Sign In to Account"}
+                {loading ? "Signing In..." : "Sign In to Account"}
               </button>
+
+              <div className="text-center pt-2">
+                <span className="text-xs text-[#8490A0]">Don&apos;t have an account yet?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTab("register");
+                    setError("");
+                  }}
+                  className="text-xs font-bold text-[#0C4A34] hover:underline ml-1"
+                >
+                  Create Account
+                </button>
+              </div>
             </form>
           ) : (
-            /* Register Form */
-            <form onSubmit={handleRegister} className="space-y-4">
+            /* Registration Form */
+            <form onSubmit={handleRegister} className="space-y-3.5">
               <div>
                 <label className="block text-xs font-bold text-[#121820] mb-1">
-                  Full Name
+                  Full Name *
                 </label>
                 <div className="relative">
-                  <UserIcon className="w-4 h-4 text-[#8490A0] absolute left-3.5 top-3.5" />
+                  <UserIcon className="w-4 h-4 text-[#8490A0] absolute left-3.5 top-3" />
                   <input
                     type="text"
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Sunil Kumar"
-                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34]"
+                    placeholder="e.g. Ramesh Reddy"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34]"
                   />
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-[#121820] mb-1">
-                  Mobile Number (+91)
+                  Mobile Number (+91) *
                 </label>
                 <div className="relative">
-                  <Phone className="w-4 h-4 text-[#8490A0] absolute left-3.5 top-3.5" />
+                  <Phone className="w-4 h-4 text-[#8490A0] absolute left-3.5 top-3" />
                   <input
                     type="tel"
                     required
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="9876543210"
-                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34]"
+                    placeholder="98480 99887"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34]"
                   />
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-[#121820] mb-1">
-                  Email Address
+                  Email Address *
                 </label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-[#8490A0] absolute left-3.5 top-3.5" />
+                  <Mail className="w-4 h-4 text-[#8490A0] absolute left-3.5 top-3" />
                   <input
                     type="email"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34]"
+                    placeholder="ramesh@example.com"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34]"
                   />
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-[#121820] mb-1">
-                  Choose Password
+                  Create Password (min 6 characters) *
                 </label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-[#8490A0] absolute left-3.5 top-3.5" />
+                  <Lock className="w-4 h-4 text-[#8490A0] absolute left-3.5 top-3" />
                   <input
                     type="password"
                     required
+                    minLength={6}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Minimum 8 characters"
-                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34]"
+                    placeholder="••••••••"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34]"
                   />
                 </div>
+              </div>
+
+              <div className="text-[11px] text-[#8490A0] leading-relaxed">
+                By creating an account, you agree to our 100% Doorstep Hygiene Guarantee in Hyderabad.
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="btn-primary w-full text-xs py-3.5 mt-2 shadow-md"
+                className="btn-primary w-full text-xs py-3.5 mt-2"
               >
-                {loading ? "Creating Account..." : "Create Account & Get Verified"}
+                {loading ? "Creating Account..." : "Create Verified Account"}
               </button>
+
+              <div className="text-center pt-2">
+                <span className="text-xs text-[#8490A0]">Already have an account?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTab("login");
+                    setError("");
+                  }}
+                  className="text-xs font-bold text-[#0C4A34] hover:underline ml-1"
+                >
+                  Sign In
+                </button>
+              </div>
             </form>
           )}
-
         </div>
+
+        {/* Footer Guarantee */}
+        <div className="bg-[#FAF9F6] border-t border-black/8 px-6 py-4 flex items-center justify-center gap-2 text-xs text-[#525D6C]">
+          <ShieldCheck className="w-4 h-4 text-[#0C4A34]" />
+          <span>Verified Hyderabad Doorstep Care • Zero Data Sharing</span>
+        </div>
+
       </div>
     </div>
   );

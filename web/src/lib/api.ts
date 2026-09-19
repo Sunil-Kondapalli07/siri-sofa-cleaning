@@ -5,7 +5,9 @@ const getHeaders = () => {
     "Content-Type": "application/json",
   };
   if (typeof window !== "undefined") {
-    const token = localStorage.getItem("siri_auth_token");
+    const token =
+      localStorage.getItem("siri_auth_token") ||
+      localStorage.getItem("siri_token");
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
     }
@@ -124,7 +126,7 @@ export const api = {
   },
 
   // Authentication
-  async login(email: string, password: string): Promise<{
+  async login(emailOrPhone: string, password: string): Promise<{
     token?: string;
     user?: User;
     error?: string;
@@ -132,9 +134,18 @@ export const api = {
     const res = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email: emailOrPhone, password }),
     });
-    return await res.json();
+    const data = await res.json();
+    if (data.token && data.user) {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("siri_auth_token", data.token);
+        localStorage.setItem("siri_token", data.token);
+        localStorage.setItem("siri_user_profile", JSON.stringify(data.user));
+        localStorage.setItem("siri_user", JSON.stringify(data.user));
+      }
+    }
+    return data;
   },
 
   async register(data: {
@@ -142,21 +153,60 @@ export const api = {
     phone: string;
     email: string;
     password: string;
-  }) {
+  }): Promise<{
+    success?: boolean;
+    token?: string;
+    user?: User;
+    requires_verification?: boolean;
+    mobile_challenge_id?: string;
+    email_challenge_id?: string;
+    dev_otp_hint?: string;
+    dev_mobile_otp?: string;
+    dev_email_otp?: string;
+    error?: string;
+  }> {
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-    return await res.json();
+    const dataRes = await res.json();
+    if (dataRes.token && dataRes.user) {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("siri_auth_token", dataRes.token);
+        localStorage.setItem("siri_token", dataRes.token);
+        localStorage.setItem("siri_user_profile", JSON.stringify(dataRes.user));
+        localStorage.setItem("siri_user", JSON.stringify(dataRes.user));
+      }
+    }
+    return dataRes;
   },
 
   async verifyOtp(challengeId: string, otp: string) {
     const res = await fetch("/api/auth/otp/verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ challenge_id: challengeId, otp }),
+      body: JSON.stringify({
+        challenge_id: challengeId,
+        otp_code: otp,
+        otp: otp,
+      }),
     });
     return await res.json();
+  },
+
+  async logout() {
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: getHeaders(),
+      });
+    } catch {}
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("siri_auth_token");
+      localStorage.removeItem("siri_token");
+      localStorage.removeItem("siri_user_profile");
+      localStorage.removeItem("siri_user");
+    }
   },
 };
