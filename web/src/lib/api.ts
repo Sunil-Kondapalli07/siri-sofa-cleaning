@@ -1,4 +1,37 @@
 import { Service, Booking, AvailableSlot, User, Technician } from "@/types";
+import { DEFAULT_SERVICES } from "./defaultData";
+
+const getApiBase = (): string => {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "");
+  }
+  if (typeof window !== "undefined") {
+    // Frontend is on port 3000, Backend API runs on port 8000
+    const hostname = window.location.hostname || "localhost";
+    return `${window.location.protocol}//${hostname}:8000`;
+  }
+  // SSR fallback
+  return "http://127.0.0.1:8000";
+};
+
+async function fetchApi(endpoint: string, options: RequestInit = {}): Promise<Response> {
+  const base = getApiBase();
+  const targetUrl = `${base}${endpoint}`;
+  try {
+    const res = await fetch(targetUrl, options);
+    return res;
+  } catch (err) {
+    // Fallback via Next.js proxy if direct port 8000 fetch fails in unusual environments
+    if (endpoint.startsWith("/api/")) {
+      try {
+        return await fetch(endpoint, options);
+      } catch {
+        throw err;
+      }
+    }
+    throw err;
+  }
+}
 
 const getHeaders = () => {
   const headers: Record<string, string> = {
@@ -19,18 +52,18 @@ export const api = {
   // Services & Pricing
   async getServices(): Promise<Service[]> {
     try {
-      const res = await fetch("/api/services", { cache: "no-store" });
+      const res = await fetchApi("/api/services", { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to load services");
       const data = await res.json();
-      return data.services || [];
+      return (data.services && data.services.length > 0) ? data.services : DEFAULT_SERVICES;
     } catch {
-      return [];
+      return DEFAULT_SERVICES;
     }
   },
 
   async getPricingConfig(): Promise<{ service_charge: number; gst_percentage: number }> {
     try {
-      const res = await fetch("/api/pricing", { cache: "no-store" });
+      const res = await fetchApi("/api/pricing", { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to load pricing");
       return await res.json();
     } catch {
@@ -41,7 +74,7 @@ export const api = {
   // Available slots for a specific date
   async getSlots(dateStr: string): Promise<AvailableSlot[]> {
     try {
-      const res = await fetch(`/api/slots/available?date=${encodeURIComponent(dateStr)}`, {
+      const res = await fetchApi(`/api/slots/available?date=${encodeURIComponent(dateStr)}`, {
         cache: "no-store",
       });
       if (!res.ok) return [];
@@ -54,7 +87,7 @@ export const api = {
 
   // Coupon validation
   async validateCoupon(code: string, subtotal: number) {
-    const res = await fetch("/api/coupons/validate", {
+    const res = await fetchApi("/api/coupons/validate", {
       method: "POST",
       headers: getHeaders(),
       body: JSON.stringify({ code, subtotal }),
@@ -69,7 +102,7 @@ export const api = {
     total_amount: number;
     error?: string;
   }> {
-    const res = await fetch("/api/bookings", {
+    const res = await fetchApi("/api/bookings", {
       method: "POST",
       headers: getHeaders(),
       body: JSON.stringify(payload),
@@ -78,7 +111,7 @@ export const api = {
   },
 
   async getBookingById(id: string): Promise<{ booking?: Booking; error?: string }> {
-    const res = await fetch(`/api/bookings/${encodeURIComponent(id)}`, {
+    const res = await fetchApi(`/api/bookings/${encodeURIComponent(id)}`, {
       headers: getHeaders(),
     });
     return await res.json();
@@ -86,7 +119,7 @@ export const api = {
 
   async getCustomerBookings(): Promise<Booking[]> {
     try {
-      const res = await fetch("/api/bookings", {
+      const res = await fetchApi("/api/bookings", {
         headers: getHeaders(),
       });
       if (!res.ok) return [];
@@ -99,7 +132,7 @@ export const api = {
 
   // Admin Bookings
   async getAdminBookings(): Promise<Booking[]> {
-    const res = await fetch("/api/bookings", {
+    const res = await fetchApi("/api/bookings", {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error("Unauthorized");
@@ -108,7 +141,7 @@ export const api = {
   },
 
   async getTechnicians(): Promise<Technician[]> {
-    const res = await fetch("/api/technicians", {
+    const res = await fetchApi("/api/technicians", {
       headers: getHeaders(),
     });
     if (!res.ok) return [];
@@ -117,7 +150,7 @@ export const api = {
   },
 
   async assignTechnician(bookingId: string, technicianId: number) {
-    const res = await fetch(`/api/bookings/${encodeURIComponent(bookingId)}/assign`, {
+    const res = await fetchApi(`/api/bookings/${encodeURIComponent(bookingId)}/assign`, {
       method: "PUT",
       headers: getHeaders(),
       body: JSON.stringify({ technician_id: technicianId }),
@@ -131,7 +164,7 @@ export const api = {
     user?: User;
     error?: string;
   }> {
-    const res = await fetch("/api/auth/login", {
+    const res = await fetchApi("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: emailOrPhone, password }),
@@ -165,7 +198,7 @@ export const api = {
     dev_email_otp?: string;
     error?: string;
   }> {
-    const res = await fetch("/api/auth/register", {
+    const res = await fetchApi("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -183,7 +216,7 @@ export const api = {
   },
 
   async verifyOtp(challengeId: string, otp: string) {
-    const res = await fetch("/api/auth/otp/verify", {
+    const res = await fetchApi("/api/auth/otp/verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -197,7 +230,7 @@ export const api = {
 
   async logout() {
     try {
-      await fetch("/api/auth/logout", {
+      await fetchApi("/api/auth/logout", {
         method: "POST",
         headers: getHeaders(),
       });

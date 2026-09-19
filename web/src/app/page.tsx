@@ -14,9 +14,10 @@ import { BookingWizardModal } from "@/components/BookingWizardModal";
 import { BookingTrackerModal } from "@/components/BookingTrackerModal";
 import { AuthModal } from "@/components/AuthModal";
 import { AdminModal } from "@/components/AdminModal";
+import { DEFAULT_SERVICES } from "@/lib/defaultData";
 
 export default function Home() {
-  const [services, setServices] = useState<Service[]>([]);
+  const [services, setServices] = useState<Service[]>(DEFAULT_SERVICES);
   const [pricingConfig, setPricingConfig] = useState({
     service_charge: 49,
     gst_percentage: 18,
@@ -137,6 +138,7 @@ export default function Home() {
         cart={cart}
         pricingConfig={pricingConfig}
         user={user}
+        onUpdateQuantity={handleUpdateQuantity}
         onBookingSuccess={handleBookingSuccess}
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenTrackingWithId={(id) => {

@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { Service, ServiceVariant, CartItem, AvailableSlot, User } from "@/types";
 import { api } from "@/lib/api";
-import { X, Check, ArrowRight, ArrowLeft, Calendar, MapPin, Tag, Sparkles, AlertCircle, Lock, ShieldCheck, User as UserIcon } from "lucide-react";
+import { DEFAULT_SERVICES } from "@/lib/defaultData";
+import { X, Check, ArrowRight, ArrowLeft, Calendar, MapPin, Tag, Sparkles, AlertCircle, Lock, ShieldCheck, User as UserIcon, Plus, Minus, Layers } from "lucide-react";
 
 interface BookingWizardModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ interface BookingWizardModalProps {
   onBookingSuccess: (bookingId: string) => void;
   onOpenAuth?: () => void;
   onOpenTrackingWithId?: (bookingId: string) => void;
+  onUpdateQuantity?: (variant: ServiceVariant, newQty: number) => void;
 }
 
 export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
@@ -27,6 +29,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   onBookingSuccess,
   onOpenAuth,
   onOpenTrackingWithId,
+  onUpdateQuantity,
 }) => {
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
@@ -54,6 +57,28 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [completedBookingId, setCompletedBookingId] = useState<string | null>(null);
+
+  const activeServices = (services && services.length > 0) ? services : DEFAULT_SERVICES;
+  const [activeCatalogCategory, setActiveCatalogCategory] = useState<string>("sofa");
+  const [showCatalogPicker, setShowCatalogPicker] = useState<boolean>(true);
+
+  // Ensure catalog picker opens if cart has no items
+  useEffect(() => {
+    if (cart.length === 0) {
+      setShowCatalogPicker(true);
+    }
+  }, [cart.length]);
+
+  const handleQuantityChange = (variant: ServiceVariant, newQty: number) => {
+    if (onUpdateQuantity) {
+      onUpdateQuantity(variant, newQty);
+    }
+  };
+
+  const getVariantQuantity = (variantId: number) => {
+    const item = cart.find((i) => i.variant.id === variantId);
+    return item ? item.quantity : 0;
+  };
 
   // Initialize customer contact if logged in
   useEffect(() => {
@@ -264,37 +289,166 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
             </div>
           ) : (
             <>
-              {/* Step 1: Selected Items Review */}
+              {/* Step 1: Selected Items & Catalog Customization */}
               {step === 1 && (
                 <div className="space-y-4">
-                  {cart.length === 0 ? (
-                    <div className="text-center py-8 text-sm text-[#8490A0]">
-                      No services selected yet. Please pick items from the catalog.
-                    </div>
-                  ) : (
+                  {/* Selected Items summary if cart has items */}
+                  {cart.length > 0 && (
                     <div className="space-y-3">
-                      {cart.map((it) => (
-                        <div
-                          key={it.variant.id}
-                          className="flex items-center justify-between p-4 bg-[#FAF9F6] rounded-2xl border border-black/5"
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-wider text-[#0C4A34]">
+                          Your Selected Services ({cart.reduce((s, i) => s + i.quantity, 0)})
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowCatalogPicker(!showCatalogPicker)}
+                          className="text-xs font-bold text-[#0C4A34] hover:underline flex items-center gap-1"
                         >
-                          <div>
-                            <div className="font-bold text-sm text-[#121820]">
-                              {it.variant.name}
+                          {showCatalogPicker ? "Hide Catalog" : "+ Add More Services"}
+                        </button>
+                      </div>
+
+                      <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                        {cart.map((it) => (
+                          <div
+                            key={it.variant.id}
+                            className="flex items-center justify-between p-3 bg-[#FAF9F6] rounded-2xl border border-black/5"
+                          >
+                            <div>
+                              <div className="font-bold text-sm text-[#121820]">
+                                {it.variant.name}
+                              </div>
+                              <div className="text-xs text-[#8490A0]">
+                                ₹{it.variant.base_price} / {it.variant.unit_type}
+                              </div>
                             </div>
-                            <div className="text-xs text-[#8490A0]">
-                              ₹{it.variant.base_price} × {it.quantity}
+
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-1.5 bg-white border border-black/10 rounded-xl p-1 shadow-xs">
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuantityChange(it.variant, it.quantity - 1)}
+                                  className="w-6 h-6 rounded-lg bg-[#FAF9F6] hover:bg-black/5 text-[#121820] flex items-center justify-center font-bold text-xs transition-colors"
+                                >
+                                  <Minus className="w-3 h-3" />
+                                </button>
+                                <span className="w-6 text-center font-extrabold text-xs text-[#121820]">
+                                  {it.quantity}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuantityChange(it.variant, it.quantity + 1)}
+                                  className="w-6 h-6 rounded-lg bg-[#0C4A34] hover:bg-[#083324] text-white flex items-center justify-center font-bold text-xs transition-colors"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                </button>
+                              </div>
+                              <div className="font-black text-sm text-[#0C4A34] min-w-[55px] text-right">
+                                ₹{it.variant.base_price * it.quantity}
+                              </div>
                             </div>
                           </div>
-                          <div className="font-bold text-sm text-[#0C4A34]">
-                            ₹{it.variant.base_price * it.quantity}
-                          </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
 
                       <div className="border-t border-black/8 pt-3 flex justify-between text-sm font-bold text-[#121820]">
-                        <span>Subtotal ({cart.reduce((s, i) => s + i.quantity, 0)} items):</span>
-                        <span>₹{subtotal}</span>
+                        <span>Subtotal:</span>
+                        <span className="text-[#0C4A34] font-black text-base">₹{subtotal}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Interactive In-Modal Catalog Picker */}
+                  {(cart.length === 0 || showCatalogPicker) && (
+                    <div className="p-4 bg-[#FAF9F6] rounded-2xl border border-black/8 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-black text-sm text-[#121820]">
+                            {cart.length === 0 ? "Select Doorstep Services" : "Add From Catalog"}
+                          </h4>
+                          <p className="text-[11px] text-[#525D6C]">
+                            Pick the seating & upholstery items you want cleaned
+                          </p>
+                        </div>
+                        {cart.length === 0 && (
+                          <span className="px-2.5 py-1 bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-bold rounded-lg">
+                            Pick at least 1 item
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Category Tabs */}
+                      <div className="flex gap-1.5 p-1 bg-white rounded-xl border border-black/5 overflow-x-auto">
+                        {activeServices.map((svc) => (
+                          <button
+                            key={svc.slug}
+                            type="button"
+                            onClick={() => setActiveCatalogCategory(svc.slug)}
+                            className={`flex-1 min-w-[70px] py-1.5 px-2.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                              activeCatalogCategory === svc.slug
+                                ? "bg-[#0C4A34] text-white shadow-xs"
+                                : "text-[#525D6C] hover:text-[#121820] hover:bg-black/5"
+                            }`}
+                          >
+                            {svc.slug === "sofa" ? "🛋️ Sofa" :
+                             svc.slug === "chair" ? "🪑 Chair" :
+                             svc.slug === "mattress" ? "🛏️ Mattress" :
+                             svc.slug === "carpet" ? "🧶 Carpet" : svc.title}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Variants List */}
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {activeServices
+                          .find((s) => s.slug === activeCatalogCategory)
+                          ?.variants.map((v) => {
+                            const qty = getVariantQuantity(v.id);
+                            return (
+                              <div
+                                key={v.id}
+                                className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-black/5 hover:border-black/10 transition-colors"
+                              >
+                                <div>
+                                  <div className="font-bold text-xs text-[#121820]">{v.name}</div>
+                                  <div className="text-[11px] text-[#8490A0]">
+                                    ₹{v.base_price} • {v.estimated_minutes} mins
+                                  </div>
+                                </div>
+
+                                {qty === 0 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleQuantityChange(v, 1)}
+                                    className="px-3 py-1 bg-[#0C4A34] hover:bg-[#083324] text-white text-xs font-bold rounded-lg flex items-center gap-1 transition-all shadow-xs"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                    <span>Add</span>
+                                  </button>
+                                ) : (
+                                  <div className="flex items-center gap-1 bg-[#FAF9F6] border border-black/10 rounded-lg p-0.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleQuantityChange(v, qty - 1)}
+                                      className="w-5 h-5 rounded bg-white hover:bg-black/5 text-[#121820] flex items-center justify-center font-bold text-xs"
+                                    >
+                                      <Minus className="w-2.5 h-2.5" />
+                                    </button>
+                                    <span className="w-5 text-center font-bold text-xs text-[#0C4A34]">
+                                      {qty}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleQuantityChange(v, qty + 1)}
+                                      className="w-5 h-5 rounded bg-[#0C4A34] text-white flex items-center justify-center font-bold text-xs"
+                                    >
+                                      <Plus className="w-2.5 h-2.5" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                       </div>
                     </div>
                   )}

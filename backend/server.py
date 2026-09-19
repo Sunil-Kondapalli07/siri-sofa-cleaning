@@ -139,29 +139,6 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
             return None
         return user
 
-    def proxy_to_nextjs(self) -> bool:
-        """Proxy non-API requests (HTML, JS, CSS, images) to Next.js on port 3000 if running"""
-        try:
-            nextjs_port = int(os.environ.get('NEXTJS_PORT', 3000))
-            url = f"http://127.0.0.1:{nextjs_port}{self.path}"
-            req_headers = {}
-            for k, v in self.headers.items():
-                if k.lower() not in ('host', 'content-length', 'connection'):
-                    req_headers[k] = v
-            req = urllib.request.Request(url, headers=req_headers)
-            with urllib.request.urlopen(req, timeout=6) as resp:
-                self.send_response(resp.status)
-                for k, v in resp.headers.items():
-                    if k.lower() not in ('transfer-encoding', 'content-length', 'connection'):
-                        self.send_header(k, v)
-                data = resp.read()
-                self.send_header('Content-Length', str(len(data)))
-                self.end_headers()
-                self.wfile.write(data)
-                return True
-        except Exception:
-            return False
-
     def do_GET(self):
         parsed_url = urllib.parse.urlparse(self.path)
         path = parsed_url.path
@@ -170,11 +147,7 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
         if path.startswith('/api/'):
             return self.handle_api_get(path, query)
 
-        # 1. First priority: proxy to modern Next.js UI on port 3000 if running
-        if self.proxy_to_nextjs():
-            return
-
-        # 2. Fallback to static file serving from FRONTEND_DIR
+        # Fallback to static file serving from FRONTEND_DIR
         rel_path = path.lstrip('/')
         if not rel_path:
             rel_path = 'index.html'
