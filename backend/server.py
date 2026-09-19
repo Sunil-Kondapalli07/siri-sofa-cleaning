@@ -520,7 +520,7 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     m_hash = hash_otp(m_code)
                     cursor.execute("""
                         INSERT INTO verification_otps (challenge_id, target, target_type, otp_hash, otp_code, expires_at, attempts, is_used, created_at, user_id)
-                        VALUES (?, ?, 'mobile', ?, NULL, ?, 0, 0, ?, ?)
+                        VALUES (?, ?, 'mobile', ?, 'HASHED', ?, 0, 0, ?, ?)
                     """, (m_challenge, phone, m_hash, expires_at, now, new_id))
                     m_res = dispatch_verification_code(phone, 'mobile', m_code, name)
                     m_delivered = m_res['delivered']
@@ -535,7 +535,7 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 e_hash = hash_otp(e_code)
                 cursor.execute("""
                     INSERT INTO verification_otps (challenge_id, target, target_type, otp_hash, otp_code, expires_at, attempts, is_used, created_at, user_id)
-                    VALUES (?, ?, 'email', ?, NULL, ?, 0, 0, ?, ?)
+                    VALUES (?, ?, 'email', ?, 'HASHED', ?, 0, 0, ?, ?)
                 """, (e_challenge, email, e_hash, expires_at, now, new_id))
                 e_res = dispatch_verification_code(email, 'email', e_code, name)
                 e_delivered = e_res['delivered']
@@ -605,7 +605,7 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
 
                 cursor.execute("""
                     INSERT INTO verification_otps (challenge_id, target, target_type, otp_hash, otp_code, expires_at, attempts, is_used, created_at, user_id)
-                    VALUES (?, ?, ?, ?, NULL, ?, 0, 0, ?, ?)
+                    VALUES (?, ?, ?, ?, 'HASHED', ?, 0, 0, ?, ?)
                 """, (challenge_id, target, otp_type, otp_h, expires_at, now, user_id))
 
                 # Real notification dispatch (SMTP or SMS gateway)
