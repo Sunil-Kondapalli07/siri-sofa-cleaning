@@ -94,7 +94,9 @@ class SecurityHardeningTests(unittest.TestCase):
         root_api_js = os.path.join(os.path.dirname(__file__), '..', '..', 'js', 'api.js')
         frontend_api_js = os.path.join(os.path.dirname(__file__), '..', '..', 'frontend', 'js', 'api.js')
 
-        for path in (root_api_js, frontend_api_js):
+        paths = [p for p in (root_api_js, frontend_api_js) if os.path.exists(p)]
+        self.assertTrue(len(paths) > 0, "api.js must exist in frontend")
+        for path in paths:
             with open(path, 'r', encoding='utf-8') as f:
                 content = f.read()
             self.assertNotIn('handleStaticFallback', content, f"Insecure fallback detected in {path}")

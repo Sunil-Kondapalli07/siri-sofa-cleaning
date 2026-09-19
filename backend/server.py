@@ -82,6 +82,9 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
         self.send_response(204)
         self.end_headers()
 
+    def do_HEAD(self):
+        self.do_GET()
+
     def send_json(self, status_code: int, data: dict):
         body = json.dumps(data).encode('utf-8')
         self.send_response(status_code)

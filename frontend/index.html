@@ -51,7 +51,34 @@
   </script>
 
   <!-- Google Fonts & Custom CSS -->
-  <link rel="stylesheet" href="css/styles.css?v=20260919-v6">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&family=Outfit:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css?v=20260919-v9">
+
+  <!-- Structured Data (JSON-LD) for LocalBusiness (Section 46) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "name": "Siri Sofa Services",
+    "image": "images/hero_luxury_sofa.jpg",
+    "description": "Professional doorstep sofa, chair, mattress, and upholstery deep steam extraction cleaning services in Hyderabad.",
+    "telephone": "+91-9123456789",
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "Hyderabad",
+      "addressRegion": "Telangana",
+      "addressCountry": "IN"
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": 17.3850,
+      "longitude": 78.4867
+    },
+    "priceRange": "₹499 - ₹2999"
+  }
+  </script>
 
   <!-- Three.js (r128 for High-Performance 3D WebGL Canvas) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -70,18 +97,20 @@
   <div id="app" class="relative z-10"></div>
 
   <!-- Application Logic Modules -->
-  <script src="js/api.js?v=20260919-v8"></script>
-  <script src="js/store.js?v=20260919-v8"></script>
-  <script src="js/3d-scroll-engine.js?v=20260919-v8"></script>
-  <script src="js/components/navbar.js?v=20260919-v8"></script>
-  <script src="js/components/hero.js?v=20260919-v8"></script>
-  <script src="js/components/hygiene-process.js?v=20260919-v7"></script>
-  <script src="js/components/service-selector.js?v=20260919-v7"></script>
-  <script src="js/components/booking-wizard.js?v=20260919-v7"></script>
-  <script src="js/components/booking-tracker.js?v=20260919-v7"></script>
-  <script src="js/components/customer-portal.js?v=20260919-v7"></script>
-  <script src="js/components/admin-portal.js?v=20260919-v7"></script>
-  <script src="js/components/reviews-faq.js?v=20260919-v7"></script>
-  <script src="js/app.js?v=20260919-v7"></script>
+  <script src="js/api.js?v=20260919-v9"></script>
+  <script src="js/store.js?v=20260919-v9"></script>
+  <script src="js/three-sofa-story.js?v=20260919-v9"></script>
+  <script src="js/3d-scroll-engine.js?v=20260919-v9"></script>
+  <script src="js/components/navbar.js?v=20260919-v9"></script>
+  <script src="js/components/hero.js?v=20260919-v9"></script>
+  <script src="js/components/story-sections.js?v=20260919-v9"></script>
+  <script src="js/components/hygiene-process.js?v=20260919-v9"></script>
+  <script src="js/components/service-selector.js?v=20260919-v9"></script>
+  <script src="js/components/booking-wizard.js?v=20260919-v9"></script>
+  <script src="js/components/booking-tracker.js?v=20260919-v9"></script>
+  <script src="js/components/customer-portal.js?v=20260919-v9"></script>
+  <script src="js/components/admin-portal.js?v=20260919-v9"></script>
+  <script src="js/components/reviews-faq.js?v=20260919-v9"></script>
+  <script src="js/app.js?v=20260919-v9"></script>
 </body>
 </html>

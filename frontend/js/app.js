@@ -157,14 +157,14 @@ const App = {
     if (viewName === 'home') {
       main.innerHTML = `
         <div id="hero-view-container">${HeroComponent.render()}</div>
-        <div id="hygiene-view-container">${HygieneProcessComponent.render()}</div>
+        <div id="story-sections-container">${StorySectionsComponent.render()}</div>
         <div id="services-view-container">${ServiceSelectorComponent.render()}</div>
         <div id="reviews-view-container">${ReviewsFaqComponent.render()}</div>
       `;
       // Initialize 3D Hero, Before/After Slider, and Modern 3D Motion
       setTimeout(() => {
         try { HeroComponent.initViewer(); } catch (e) { console.warn("Hero 3D notice:", e); }
-        try { HygieneProcessComponent.initSlider(); } catch (e) { console.warn("Slider notice:", e); }
+        try { StorySectionsComponent.initSlider(); } catch (e) { console.warn("Slider notice:", e); }
         this.init3DMotionEffects();
       }, 70);
 
