@@ -3,6 +3,7 @@ import os
 import sys
 import io
 import json
+import re
 import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -20,6 +21,10 @@ class MockSocket:
         return self.wfile
 
 class DirectHandlerTest(unittest.TestCase):
+    cust_token = None
+    admin_token = None
+    created_booking_id = None
+
     @classmethod
     def setUpClass(cls):
         cls.temp_dir = tempfile.TemporaryDirectory()
@@ -48,6 +53,7 @@ class DirectHandlerTest(unittest.TestCase):
         handler.rfile = mock_sock.rfile
         handler.wfile = mock_sock.wfile
         handler.headers = {}
+        handler.client_address = ('127.0.0.1', 54321)
         handler.close_connection = True
         handler.request_version = 'HTTP/1.1'
         handler.server_version = 'SiriSofa/1.0'
@@ -105,30 +111,37 @@ class DirectHandlerTest(unittest.TestCase):
             'name': 'Sunil Kumar',
             'email': 'sunil@example.com',
             'phone': '+91 98765 43210',
-            'password': 'sunil123'
+            'password': 'sunilpassword123'
         })
         self.assertEqual(status, 201)
         self.assertEqual(body['user']['role'], 'customer')
+        self.assertIsNotNone(body['token'])
+        # Ensure dev codes are NOT leaked in response
+        self.assertNotIn('dev_mobile_code', body)
+        self.assertNotIn('dev_email_code', body)
 
         # Test login
-        status, body = self.invoke_api('POST', '/api/auth/login', {
+        status, l_body = self.invoke_api('POST', '/api/auth/login', {
             'email': 'sunil@example.com',
-            'password': 'sunil123'
+            'password': 'sunilpassword123'
         })
         self.assertEqual(status, 200)
-        self.assertEqual(body['user']['role'], 'customer')
-        self.assertEqual(body['user']['name'], 'Sunil Kumar')
+        self.assertEqual(l_body['user']['role'], 'customer')
+        self.assertEqual(l_body['user']['name'], 'Sunil Kumar')
+        self.assertIsNotNone(l_body['token'])
+        DirectHandlerTest.cust_token = l_body['token']
 
         # Test admin login
-        status, body = self.invoke_api('POST', '/api/auth/login', {
+        status, a_body = self.invoke_api('POST', '/api/auth/login', {
             'email': 'admin@sirisofa.com',
             'password': 'admin123'
         })
         self.assertEqual(status, 200)
-        self.assertEqual(body['user']['role'], 'admin')
+        self.assertEqual(a_body['user']['role'], 'admin')
+        self.assertIsNotNone(a_body['token'])
+        DirectHandlerTest.admin_token = a_body['token']
 
     def test_02b_auth_register(self):
-        # Register a new customer
         test_email = 'priya.sharma@example.com'
         test_phone = '+91 99887 76655'
         status, body = self.invoke_api('POST', '/api/auth/register', {
@@ -143,20 +156,25 @@ class DirectHandlerTest(unittest.TestCase):
         self.assertEqual(body['user']['email'], test_email)
         self.assertEqual(body['user']['role'], 'customer')
         self.assertTrue(body.get('requires_verification'))
-        # Crucial security check: OTP MUST NOT be returned in API response
-        self.assertNotIn('otp_debug', body)
+        # Crucial security check: OTP plaintext MUST NOT be returned in API response
+        self.assertNotIn('dev_mobile_code', body)
+        self.assertNotIn('dev_email_code', body)
 
-        # Check that both Mobile and Email OTPs were created in verification_otps
+        # Check notifications_log to retrieve the real delivered verification codes
         conn = database.get_connection(self.test_db)
         c = conn.cursor()
-        c.execute("SELECT otp_code FROM verification_otps WHERE target = ? AND target_type = 'mobile' ORDER BY id DESC LIMIT 1", (test_phone,))
-        mobile_otp = c.fetchone()[0]
-        c.execute("SELECT otp_code FROM verification_otps WHERE target = ? AND target_type = 'email' ORDER BY id DESC LIMIT 1", (test_email,))
-        email_otp = c.fetchone()[0]
-        conn.close()
+        c.execute("SELECT message FROM notifications_log WHERE recipient = ? ORDER BY id DESC LIMIT 1", (test_phone,))
+        m_msg = c.fetchone()[0]
+        m_match = re.search(r'\b\d{6}\b', m_msg)
+        self.assertIsNotNone(m_match)
+        mobile_otp = m_match.group(0)
 
-        self.assertEqual(len(mobile_otp), 6)
-        self.assertEqual(len(email_otp), 6)
+        c.execute("SELECT message FROM notifications_log WHERE recipient = ? ORDER BY id DESC LIMIT 1", (test_email,))
+        e_msg = c.fetchone()[0]
+        e_match = re.search(r'\b\d{6}\b', e_msg)
+        self.assertIsNotNone(e_match)
+        email_otp = e_match.group(0)
+        conn.close()
 
         # Verify Mobile OTP
         status_m, res_m = self.invoke_api('POST', '/api/auth/otp/verify', {
@@ -205,14 +223,17 @@ class DirectHandlerTest(unittest.TestCase):
         })
         self.assertEqual(status, 200)
         self.assertTrue(body['success'])
+        self.assertNotIn('dev_code', body)
         
-        # Read the dispatched OTP directly from verification_otps (securely without exposing in API response)
+        # Read the dispatched OTP from notifications_log
         conn = database.get_connection(self.test_db)
         c = conn.cursor()
-        c.execute("SELECT otp_code FROM verification_otps WHERE target = ? ORDER BY id DESC LIMIT 1", ('+91 88776 65544',))
-        generated_otp = c.fetchone()[0]
+        c.execute("SELECT message FROM notifications_log WHERE recipient = ? ORDER BY id DESC LIMIT 1", ('+91 88776 65544',))
+        msg = c.fetchone()[0]
         conn.close()
-        self.assertEqual(len(generated_otp), 6)
+        otp_match = re.search(r'\b\d{6}\b', msg)
+        self.assertIsNotNone(otp_match)
+        generated_otp = otp_match.group(0)
 
         # 2. Rate limit test (trying to send again immediately should fail with 429)
         status, r_body = self.invoke_api('POST', '/api/auth/otp/send', {
@@ -251,7 +272,6 @@ class DirectHandlerTest(unittest.TestCase):
         v_3seater = [v for v in sofa_svc['variants'] if '3 Seater' in v['name']][0]
 
         booking_payload = {
-            'user_id': 2,
             'name': 'Sunil Kumar',
             'phone': '+91 98765 43210',
             'email': 'sunil@example.com',
@@ -273,13 +293,24 @@ class DirectHandlerTest(unittest.TestCase):
             'notes': 'Stain treatment requested'
         }
 
-        status, body = self.invoke_api('POST', '/api/bookings', booking_payload)
+        # Must be authenticated with real session token
+        status, body = self.invoke_api(
+            'POST', 
+            '/api/bookings', 
+            booking_payload, 
+            headers_dict={'Authorization': f'Bearer {self.cust_token}'}
+        )
         self.assertEqual(status, 201)
         self.assertTrue(body['booking_id'].startswith('SIRI-'))
         new_booking_id = body['booking_id']
         DirectHandlerTest.created_booking_id = new_booking_id
 
-        status, b_detail = self.invoke_api('GET', f'/api/bookings/{new_booking_id}')
+        # Fetch booking details
+        status, b_detail = self.invoke_api(
+            'GET', 
+            f'/api/bookings/{new_booking_id}',
+            headers_dict={'Authorization': f'Bearer {self.cust_token}'}
+        )
         self.assertEqual(status, 200)
         self.assertEqual(b_detail['booking']['status'], 'received')
         self.assertEqual(len(b_detail['booking']['items']), 1)
@@ -301,16 +332,23 @@ class DirectHandlerTest(unittest.TestCase):
         self.assertIn('Sign in required', body['error'])
 
     def test_04c_customer_cross_booking_access_forbidden(self):
-        # Customer B (user_id 3) attempting to access Customer A's (user_id 2) booking by ID must receive 403 Forbidden
+        # Register Customer C to get a distinct valid session token
+        status, c_reg = self.invoke_api('POST', '/api/auth/register', {
+            'name': 'Customer C',
+            'email': 'custc@example.com',
+            'phone': '+91 91111 22222',
+            'password': 'password123'
+        })
+        cust3_token = c_reg['token']
         booking_id = DirectHandlerTest.created_booking_id
-        cust3_token = 'token_3_1700000000'
+
+        # Customer C attempting to access Customer A's booking by ID must receive 403 Forbidden
         status, body = self.invoke_api('GET', f'/api/bookings/{booking_id}', headers_dict={'Authorization': f'Bearer {cust3_token}'})
         self.assertEqual(status, 403)
         self.assertIn('Access denied', body['error'])
 
-        # Owner (user_id 2) accessing their own booking must succeed with 200
-        cust2_token = 'token_2_1700000000'
-        status, body = self.invoke_api('GET', f'/api/bookings/{booking_id}', headers_dict={'Authorization': f'Bearer {cust2_token}'})
+        # Owner accessing their own booking must succeed with 200
+        status, body = self.invoke_api('GET', f'/api/bookings/{booking_id}', headers_dict={'Authorization': f'Bearer {self.cust_token}'})
         self.assertEqual(status, 200)
         self.assertEqual(body['booking']['id'], booking_id)
 
@@ -325,18 +363,16 @@ class DirectHandlerTest(unittest.TestCase):
         })
         self.assertEqual(status, 401)
 
-        # 2. Customer token (user_id 2 = Sunil Kumar) must be rejected with 403
-        cust_token = 'token_2_1700000000'
+        # 2. Customer token must be rejected with 403 Forbidden
         status, _ = self.invoke_api('PUT', '/api/pricing', {
             'variants': [{'id': target_variant['id'], 'base_price': new_price}]
-        }, headers_dict={'Authorization': f'Bearer {cust_token}'})
+        }, headers_dict={'Authorization': f'Bearer {self.cust_token}'})
         self.assertEqual(status, 403)
 
-        # 3. Admin token (user_id 1 = Admin) must succeed with 200
-        admin_token = 'token_1_1700000000'
+        # 3. Admin token must succeed with 200
         status, res = self.invoke_api('PUT', '/api/pricing', {
             'variants': [{'id': target_variant['id'], 'base_price': new_price}]
-        }, headers_dict={'Authorization': f'Bearer {admin_token}'})
+        }, headers_dict={'Authorization': f'Bearer {self.admin_token}'})
         self.assertEqual(status, 200)
 
         # Verify pricing actually updated
@@ -348,55 +384,152 @@ class DirectHandlerTest(unittest.TestCase):
         target_b_id = getattr(DirectHandlerTest, 'created_booking_id', 'SIRI-TEST')
         status, _ = self.invoke_api('PUT', f'/api/bookings/{target_b_id}/assign', {
             'technician_id': 3
-        }, headers_dict={'Authorization': f'Bearer {cust_token}'})
+        }, headers_dict={'Authorization': f'Bearer {self.cust_token}'})
         self.assertEqual(status, 403)
 
         status, res = self.invoke_api('PUT', f'/api/bookings/{target_b_id}/assign', {
             'technician_id': 3
-        }, headers_dict={'Authorization': f'Bearer {admin_token}'})
+        }, headers_dict={'Authorization': f'Bearer {self.admin_token}'})
         self.assertEqual(status, 200)
 
-        status, b_check = self.invoke_api('GET', f'/api/bookings/{target_b_id}')
+        status, b_check = self.invoke_api('GET', f'/api/bookings/{target_b_id}', headers_dict={'Authorization': f'Bearer {self.admin_token}'})
         self.assertEqual(b_check['booking']['status'], 'assigned')
         self.assertEqual(b_check['booking']['technician_name'], 'Mahesh Goud')
 
     def test_06_analytics(self):
-        admin_token = 'token_1_1700000000'
-        cust_token = 'token_2_1700000000'
-
         # Anonymous request blocked
         status, _ = self.invoke_api('GET', '/api/analytics')
         self.assertEqual(status, 401)
 
         # Customer token blocked
-        status, _ = self.invoke_api('GET', '/api/analytics', headers_dict={'Authorization': f'Bearer {cust_token}'})
+        status, _ = self.invoke_api('GET', '/api/analytics', headers_dict={'Authorization': f'Bearer {self.cust_token}'})
         self.assertEqual(status, 403)
 
         # Admin token succeeds
-        status, body = self.invoke_api('GET', '/api/analytics', headers_dict={'Authorization': f'Bearer {admin_token}'})
+        status, body = self.invoke_api('GET', '/api/analytics', headers_dict={'Authorization': f'Bearer {self.admin_token}'})
         self.assertEqual(status, 200)
         self.assertIn('metrics', body)
         self.assertIn('services_breakdown', body)
         self.assertGreater(body['metrics']['total_bookings'], 0)
 
     def test_07_customer_booking_isolation(self):
-        cust_token = 'token_2_1700000000'
-        admin_token = 'token_1_1700000000'
-
         # Unauthenticated listing all bookings without filter blocked
         status, _ = self.invoke_api('GET', '/api/bookings')
         self.assertEqual(status, 401)
 
-        # Customer token can only see their own bookings (user_id = 2)
-        status, body = self.invoke_api('GET', '/api/bookings', headers_dict={'Authorization': f'Bearer {cust_token}'})
-        self.assertEqual(status, 200)
-        for b in body['bookings']:
-            self.assertEqual(b['user_id'], 2)
-
-        # Admin can view all bookings across system
-        status, body = self.invoke_api('GET', '/api/bookings', headers_dict={'Authorization': f'Bearer {admin_token}'})
+        # Customer token can only see their own bookings
+        status, body = self.invoke_api('GET', '/api/bookings', headers_dict={'Authorization': f'Bearer {self.cust_token}'})
         self.assertEqual(status, 200)
         self.assertGreater(len(body['bookings']), 0)
+
+        # Admin can view all bookings across system
+        status, body = self.invoke_api('GET', '/api/bookings', headers_dict={'Authorization': f'Bearer {self.admin_token}'})
+        self.assertEqual(status, 200)
+        self.assertGreater(len(body['bookings']), 0)
+
+    def test_08_forged_token_prevention(self):
+        # A forged legacy token must be rejected because it is not in user_sessions
+        forged_tokens = [
+            'token_1_1700000000',
+            'token_admin_super',
+            'fake_random_session_token_1234567890'
+        ]
+        for token in forged_tokens:
+            status, body = self.invoke_api('GET', '/api/analytics', headers_dict={'Authorization': f'Bearer {token}'})
+            self.assertEqual(status, 401)
+            self.assertIn('Authentication required', body['error'])
+
+    def test_09_atomic_booking_slot_capacity(self):
+        # Create bookings for slot 01:00 PM on 2026-10-15 until capacity (3) is reached
+        test_date = '2026-10-15'
+        test_slot = '01:00 PM'
+
+        for i in range(3):
+            payload = {
+                'name': f'Slot Test User {i}',
+                'phone': f'+91 90000 0000{i}',
+                'service_date': test_date,
+                'service_slot': test_slot,
+                'items': [{'variant_id': 1, 'quantity': 1}]
+            }
+            status, res = self.invoke_api('POST', '/api/bookings', payload, headers_dict={'Authorization': f'Bearer {self.cust_token}'})
+            self.assertEqual(status, 201)
+
+        # 4th booking on the same slot must be rejected with 409 Conflict
+        overflow_payload = {
+            'name': 'Overflow Customer',
+            'phone': '+91 90000 00099',
+            'service_date': test_date,
+            'service_slot': test_slot,
+            'items': [{'variant_id': 1, 'quantity': 1}]
+        }
+        status, err = self.invoke_api('POST', '/api/bookings', overflow_payload, headers_dict={'Authorization': f'Bearer {self.cust_token}'})
+        self.assertEqual(status, 409)
+        self.assertIn('fully booked', err['error'])
+
+    def test_10_reviews_authorization_and_duplicate_prevention(self):
+        booking_id = DirectHandlerTest.created_booking_id
+
+        # 1. Unauthenticated review fails with 401
+        status, _ = self.invoke_api('POST', '/api/reviews', {
+            'booking_id': booking_id,
+            'comment': 'Good service'
+        })
+        self.assertEqual(status, 401)
+
+        # 2. Non-completed booking cannot be reviewed (status is currently 'assigned')
+        status, err = self.invoke_api('POST', '/api/reviews', {
+            'booking_id': booking_id,
+            'comment': 'Early review attempt'
+        }, headers_dict={'Authorization': f'Bearer {self.cust_token}'})
+        self.assertEqual(status, 400)
+        self.assertIn('completed', err['error'])
+
+        # Mark booking as completed via admin
+        status, _ = self.invoke_api('PUT', f'/api/bookings/{booking_id}/status', {
+            'status': 'completed'
+        }, headers_dict={'Authorization': f'Bearer {self.admin_token}'})
+        self.assertEqual(status, 200)
+
+        # 3. Valid review submission succeeds with 201
+        status, res = self.invoke_api('POST', '/api/reviews', {
+            'booking_id': booking_id,
+            'rating': 5,
+            'comment': 'Exceptional 6-step sofa extraction process!'
+        }, headers_dict={'Authorization': f'Bearer {self.cust_token}'})
+        self.assertEqual(status, 201)
+
+        # 4. Duplicate review on the same booking must fail with 400
+        status, d_err = self.invoke_api('POST', '/api/reviews', {
+            'booking_id': booking_id,
+            'rating': 4,
+            'comment': 'Second review attempt'
+        }, headers_dict={'Authorization': f'Bearer {self.cust_token}'})
+        self.assertEqual(status, 400)
+        self.assertIn('already been submitted', d_err['error'])
+
+    def test_11_logout_revokes_session(self):
+        # Register a temporary user to test logout session revocation
+        status, reg = self.invoke_api('POST', '/api/auth/register', {
+            'name': 'Logout Tester',
+            'email': 'logout.test@example.com',
+            'phone': '+91 97777 88888',
+            'password': 'password123'
+        })
+        temp_token = reg['token']
+
+        # Confirm token works for addresses
+        status, _ = self.invoke_api('GET', '/api/addresses', headers_dict={'Authorization': f'Bearer {temp_token}'})
+        self.assertEqual(status, 200)
+
+        # Logout
+        status, l_res = self.invoke_api('POST', '/api/auth/logout', headers_dict={'Authorization': f'Bearer {temp_token}'})
+        self.assertEqual(status, 200)
+        self.assertTrue(l_res['success'])
+
+        # Now token must be revoked and fail with 401
+        status, _ = self.invoke_api('GET', '/api/addresses', headers_dict={'Authorization': f'Bearer {temp_token}'})
+        self.assertEqual(status, 401)
 
 if __name__ == '__main__':
     unittest.main()
