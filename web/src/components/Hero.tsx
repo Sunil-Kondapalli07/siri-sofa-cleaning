@@ -9,14 +9,11 @@ import {
   Star,
   CheckCircle,
   Zap,
-  Layers,
   Flame,
   Droplets,
   Microscope,
-  Info,
   X,
   Eye,
-  SlidersHorizontal,
 } from "lucide-react";
 import { AtmosphereCanvas } from "./AtmosphereCanvas";
 

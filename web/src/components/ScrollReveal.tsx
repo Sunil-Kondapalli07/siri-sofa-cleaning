@@ -23,7 +23,12 @@ export const ScrollReveal: React.FC<ScrollRevealProps> = ({
   distance = "24px",
   once = true,
 }) => {
-  const [isVisible, setIsVisible] = useState(false);
+  const [isVisible, setIsVisible] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    }
+    return false;
+  });
   const elementRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -31,11 +36,7 @@ export const ScrollReveal: React.FC<ScrollRevealProps> = ({
     if (!el) return;
 
     // Check if user prefers reduced motion
-    const prefersReducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
-    if (prefersReducedMotion) {
-      setIsVisible(true);
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       return;
     }
 

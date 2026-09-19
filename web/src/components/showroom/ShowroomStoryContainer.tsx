@@ -7,10 +7,7 @@ import { MagneticButton } from "./MagneticButton";
 import {
   Sparkles,
   ArrowRight,
-  ShieldCheck,
-  Zap,
   CheckCircle2,
-  Droplets,
   Flame,
   Star,
   Plus,
@@ -25,7 +22,7 @@ interface ShowroomStoryContainerProps {
   onUpdateQuantity: (variant: ServiceVariant, newQty: number) => void;
   onOpenBooking: () => void;
   onOpenTracking: () => void;
-  user: User | null;
+  user?: User | null;
 }
 
 export const ShowroomStoryContainer: React.FC<ShowroomStoryContainerProps> = ({
@@ -35,7 +32,6 @@ export const ShowroomStoryContainer: React.FC<ShowroomStoryContainerProps> = ({
   onUpdateQuantity,
   onOpenBooking,
   onOpenTracking,
-  user,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scrollProgress, setScrollProgress] = useState(0);

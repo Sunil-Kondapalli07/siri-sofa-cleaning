@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { Booking } from "@/types";
 import { api } from "@/lib/api";
-import { X, Search, Clock, CheckCircle2, User, Phone, MapPin, Calendar } from "lucide-react";
+import { X, Search, Clock, User, Phone, MapPin, Calendar } from "lucide-react";
 
 interface BookingTrackerModalProps {
   isOpen: boolean;

@@ -18,9 +18,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  const loadData = async () => {
-    setLoading(true);
-    setError("");
+  const refresh = async () => {
     try {
       const [bList, tList] = await Promise.all([
         api.getAdminBookings(),
@@ -36,9 +34,25 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
   };
 
   useEffect(() => {
-    if (isOpen) {
-      loadData();
-    }
+    if (!isOpen) return;
+    let isCancelled = false;
+
+    Promise.all([api.getAdminBookings(), api.getTechnicians()])
+      .then(([bList, tList]) => {
+        if (!isCancelled) {
+          setBookings(bList);
+          setTechnicians(tList);
+        }
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setError("Admin access restricted. Please sign in with staff credentials.");
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -50,7 +64,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
       await api.assignTechnician(bookingId, techId);
       setSuccessMsg(`Technician assigned to booking #${bookingId}`);
       setTimeout(() => setSuccessMsg(""), 3000);
-      loadData();
+      refresh();
     } catch {
       setError("Failed to assign technician");
     }
@@ -72,7 +86,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={loadData}
+              onClick={refresh}
               className="p-2 rounded-xl border border-black/10 hover:bg-black/5 text-[#525D6C]"
               title="Refresh"
             >

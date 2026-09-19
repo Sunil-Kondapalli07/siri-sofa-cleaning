@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Service, ServiceVariant, CartItem, AvailableSlot, User } from "@/types";
 import { api } from "@/lib/api";
 import { DEFAULT_SERVICES } from "@/lib/defaultData";
-import { X, Check, ArrowRight, ArrowLeft, Calendar, MapPin, Tag, Sparkles, AlertCircle, Lock, ShieldCheck, User as UserIcon, Plus, Minus, Layers } from "lucide-react";
+import { X, Check, ArrowRight, ArrowLeft, Sparkles, AlertCircle, Lock, Plus, Minus } from "lucide-react";
 
 interface BookingWizardModalProps {
   isOpen: boolean;
@@ -17,6 +17,12 @@ interface BookingWizardModalProps {
   onOpenAuth?: () => void;
   onOpenTrackingWithId?: (bookingId: string) => void;
   onUpdateQuantity?: (variant: ServiceVariant, newQty: number) => void;
+}
+
+function getTomorrowDateString(): string {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return tomorrow.toISOString().split("T")[0];
 }
 
 export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
@@ -32,9 +38,9 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   onUpdateQuantity,
 }) => {
   const [step, setStep] = useState(1);
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
+  const [name, setName] = useState(() => user?.name || "");
+  const [phone, setPhone] = useState(() => user?.phone || "");
+  const [email, setEmail] = useState(() => user?.email || "");
   const [password, setPassword] = useState("");
   const [houseFlat, setHouseFlat] = useState("");
   const [street, setStreet] = useState("");
@@ -42,9 +48,12 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   const [pincode, setPincode] = useState("500034");
   const [instructions, setInstructions] = useState("");
 
+  // Validation errors (must be called unconditionally before early return)
+  const [contactErrors, setContactErrors] = useState<Record<string, string>>({});
+  const [addressErrors, setAddressErrors] = useState<Record<string, string>>({});
+
   // Step 4: Date & Slot
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
-  const [serviceDate, setServiceDate] = useState(tomorrow);
+  const [serviceDate, setServiceDate] = useState<string>(getTomorrowDateString);
   const [serviceSlot, setServiceSlot] = useState("");
   const [slots, setSlots] = useState<AvailableSlot[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -62,13 +71,6 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   const [activeCatalogCategory, setActiveCatalogCategory] = useState<string>("sofa");
   const [showCatalogPicker, setShowCatalogPicker] = useState<boolean>(true);
 
-  // Ensure catalog picker opens if cart has no items
-  useEffect(() => {
-    if (cart.length === 0) {
-      setShowCatalogPicker(true);
-    }
-  }, [cart.length]);
-
   const handleQuantityChange = (variant: ServiceVariant, newQty: number) => {
     if (onUpdateQuantity) {
       onUpdateQuantity(variant, newQty);
@@ -80,28 +82,43 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     return item ? item.quantity : 0;
   };
 
-  // Initialize customer contact if logged in
+  // Synchronize customer contact if logged-in user changes
   useEffect(() => {
     if (user) {
-      if (user.name && !name) setName(user.name);
-      if (user.phone && !phone) setPhone(user.phone);
-      if (user.email && !email) setEmail(user.email);
+      queueMicrotask(() => {
+        setName((prev) => prev || user.name || "");
+        setPhone((prev) => prev || user.phone || "");
+        setEmail((prev) => prev || user.email || "");
+      });
     }
   }, [user]);
 
   // Load available slots when serviceDate changes
   useEffect(() => {
-    if (serviceDate) {
-      setLoadingSlots(true);
-      api.getSlots(serviceDate).then((fetchedSlots) => {
-        setSlots(fetchedSlots);
-        setLoadingSlots(false);
-        const firstAvailable = fetchedSlots.find((s) => s.available);
-        if (firstAvailable && (!serviceSlot || !fetchedSlots.find(s => s.slot === serviceSlot && s.available))) {
-          setServiceSlot(firstAvailable.slot);
-        }
-      });
-    }
+    if (!serviceDate) return;
+    let isCurrent = true;
+    queueMicrotask(() => {
+      if (isCurrent) setLoadingSlots(true);
+    });
+
+    api.getSlots(serviceDate).then((fetchedSlots) => {
+      if (!isCurrent) return;
+      setSlots(fetchedSlots);
+      setLoadingSlots(false);
+      const firstAvailable = fetchedSlots.find((s) => s.available);
+      if (firstAvailable) {
+        setServiceSlot((prev) => {
+          if (!prev || !fetchedSlots.find((s) => s.slot === prev && s.available)) {
+            return firstAvailable.slot;
+          }
+          return prev;
+        });
+      }
+    });
+
+    return () => {
+      isCurrent = false;
+    };
   }, [serviceDate]);
 
   if (!isOpen) return null;
@@ -129,10 +146,6 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
       setCouponError("Could not validate coupon");
     }
   };
-
-  // Validation errors
-  const [contactErrors, setContactErrors] = useState<Record<string, string>>({});
-  const [addressErrors, setAddressErrors] = useState<Record<string, string>>({});
 
   const validateStep2 = (): boolean => {
     const errs: Record<string, string> = {};
@@ -767,7 +780,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                     <input
                       type="date"
                       value={serviceDate}
-                      min={tomorrow}
+                      min={getTomorrowDateString()}
                       onChange={(e) => setServiceDate(e.target.value)}
                       className="w-full px-4 py-3 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34]"
                       required

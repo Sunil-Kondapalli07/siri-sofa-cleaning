@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Clock, ShieldCheck, MapPin, Sparkles, Award, ThumbsUp } from "lucide-react";
+import { ShieldCheck, MapPin, Sparkles, Award } from "lucide-react";
 
 export const Features: React.FC = () => {
   const steps = [

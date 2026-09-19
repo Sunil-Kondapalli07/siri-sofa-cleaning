@@ -17,8 +17,6 @@ import {
   KeyRound,
   Eye,
   EyeOff,
-  Settings,
-  ExternalLink,
 } from "lucide-react";
 
 declare global {
@@ -71,9 +69,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     target: string;
   } | null>(null);
 
-  // Inline field validation errors & touched flags
+  // Inline field validation errors
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   // Registration OTP Challenge state
   const [requiresOtp, setRequiresOtp] = useState(false);
@@ -92,24 +89,70 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [forgotDevOtp, setForgotDevOtp] = useState<string | null>(null);
 
   // Google OAuth 2.0 / GIS states
-  const [googleClientId, setGoogleClientId] = useState<string>("");
+  const [googleClientId] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return (
+        localStorage.getItem("siri_google_client_id") ||
+        process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
+        ""
+      );
+    }
+    return process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+  });
   const [showGoogleModal, setShowGoogleModal] = useState(false);
-  const [clientInput, setClientInput] = useState("");
   const [googleLoading, setGoogleLoading] = useState(false);
   const [googleEmail, setGoogleEmail] = useState("sunil@example.com");
   const [googleName, setGoogleName] = useState("Sunil Kumar");
 
-  // Load configured Google Client ID from env or localStorage
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const stored =
-        localStorage.getItem("siri_google_client_id") ||
-        process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
-        "";
-      setGoogleClientId(stored);
-      setClientInput(stored);
+  // Validation helpers
+  const isValidEmail = (val: string) =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
+
+  const isValidPhone = (val: string) => {
+    const clean = val.replace(/\+91|\s|-/g, "");
+    return /^[6-9]\d{9}$/.test(clean);
+  };
+
+  const clearErrors = () => {
+    setError("");
+    setFieldErrors({});
+    setUserExistsNotice(null);
+    setSuccessMessage("");
+  };
+
+  const markTouched = (fieldName: string) => {
+    if (fieldName === "email" && email.trim()) {
+      if (email.includes("@") && !isValidEmail(email)) {
+        setFieldErrors((prev) => ({ ...prev, email: "Please enter a valid email address." }));
+      }
+    } else if (fieldName === "phone" && phone.trim()) {
+      if (!isValidPhone(phone)) {
+        setFieldErrors((prev) => ({ ...prev, phone: "Please enter a valid 10-digit Indian mobile number." }));
+      }
     }
-  }, []);
+  };
+
+  // --- Real Google Credential Login (from official Google ID Token JWT) ---
+  const handleGoogleCredentialLogin = React.useCallback(async (credential: string) => {
+    clearErrors();
+    setGoogleLoading(true);
+    try {
+      const res = await api.googleLogin({ credential });
+      if (res.success && res.user) {
+        setShowGoogleModal(false);
+        onLoginSuccess(res.user);
+        onClose();
+      } else {
+        setError(
+          res.error || "Google token verification failed. Please try again."
+        );
+      }
+    } catch {
+      setError("Network or verification error during Google sign-in.");
+    } finally {
+      setGoogleLoading(false);
+    }
+  }, [onLoginSuccess, onClose]);
 
   // Initialize Real Google Identity Services (GIS) if client ID is configured
   useEffect(() => {
@@ -152,29 +195,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setupGoogleGis();
     const timer = setTimeout(setupGoogleGis, 400);
     return () => clearTimeout(timer);
-  }, [googleClientId, tab, isOpen]);
+  }, [googleClientId, tab, isOpen, handleGoogleCredentialLogin]);
 
   if (!isOpen) return null;
-
-  // Validation helpers
-  const isValidEmail = (val: string) =>
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
-
-  const isValidPhone = (val: string) => {
-    const clean = val.replace(/\+91|\s|-/g, "");
-    return /^[6-9]\d{9}$/.test(clean);
-  };
-
-  const markTouched = (fieldName: string) => {
-    setTouched((prev) => ({ ...prev, [fieldName]: true }));
-  };
-
-  const clearErrors = () => {
-    setError("");
-    setFieldErrors({});
-    setUserExistsNotice(null);
-    setSuccessMessage("");
-  };
 
   // --- Sign In Validation & Submission ---
   const validateLoginForm = (): boolean => {
@@ -458,27 +481,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  // --- Real Google Credential Login (from official Google ID Token JWT) ---
-  const handleGoogleCredentialLogin = async (credential: string) => {
-    clearErrors();
-    setGoogleLoading(true);
-    try {
-      const res = await api.googleLogin({ credential });
-      if (res.success && res.user) {
-        setShowGoogleModal(false);
-        onLoginSuccess(res.user);
-        onClose();
-      } else {
-        setError(
-          res.error || "Google token verification failed. Please try again."
-        );
-      }
-    } catch {
-      setError("Network or verification error during Google sign-in.");
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
 
   // --- Simulated / Custom Google Profile Sign-In ---
   const handleGoogleDirectSignIn = async (
@@ -510,16 +512,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  // Save custom Google Client ID
-  const handleSaveGoogleClientId = () => {
-    const trimmed = clientInput.trim();
-    if (trimmed) {
-      localStorage.setItem("siri_google_client_id", trimmed);
-      setGoogleClientId(trimmed);
-      setSuccessMessage("Google Client ID saved! Initializing live Google popup...");
-      setShowGoogleModal(false);
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto">

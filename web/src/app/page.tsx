@@ -23,7 +23,21 @@ export default function Home() {
     gst_percentage: 18,
   });
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    if (typeof window !== "undefined") {
+      const savedUser =
+        localStorage.getItem("siri_user_profile") ||
+        localStorage.getItem("siri_user");
+      if (savedUser) {
+        try {
+          return JSON.parse(savedUser);
+        } catch {
+          // ignore
+        }
+      }
+    }
+    return null;
+  });
 
   // Modals state
   const [isBookingOpen, setIsBookingOpen] = useState(false);
@@ -40,18 +54,6 @@ export default function Home() {
     api.getPricingConfig().then((cfg) => {
       if (cfg) setPricingConfig(cfg);
     });
-
-    // 2. Check existing session
-    const savedUser =
-      localStorage.getItem("siri_user_profile") ||
-      localStorage.getItem("siri_user");
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch {
-        // ignore
-      }
-    }
   }, []);
 
   const handleUpdateQuantity = (variant: ServiceVariant, newQty: number) => {

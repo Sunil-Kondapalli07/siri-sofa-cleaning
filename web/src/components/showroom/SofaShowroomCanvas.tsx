@@ -507,7 +507,7 @@ export const SofaShowroomCanvas: React.FC<SofaShowroomCanvasProps> = ({
 
     // 7. Render Loop
     let animationFrameId: number;
-    let clock = new THREE.Clock();
+    const clock = new THREE.Clock();
 
     const render = () => {
       const elapsedTime = clock.getElapsedTime();

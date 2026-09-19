@@ -71,7 +71,9 @@ export const CinematicBrandFilm: React.FC<CinematicBrandFilmProps> = ({
       // map 0.60 - 0.80 to 15% - 85%
       const localP = (smoothProgress - 0.60) / 0.20;
       const targetPos = Math.round(15 + localP * 70);
-      setScrubberPos(targetPos);
+      queueMicrotask(() => {
+        setScrubberPos(targetPos);
+      });
     }
   }, [smoothProgress, hasUserDragged]);
 
@@ -91,7 +93,9 @@ export const CinematicBrandFilm: React.FC<CinematicBrandFilmProps> = ({
     setIsDraggingScrubber(true);
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
-    } catch (_) {}
+    } catch {
+      // ignore
+    }
     updateScrubberFromClientX(e.clientX);
   };
 
@@ -104,7 +108,9 @@ export const CinematicBrandFilm: React.FC<CinematicBrandFilmProps> = ({
     setIsDraggingScrubber(false);
     try {
       e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch (_) {}
+    } catch {
+      // ignore
+    }
   };
 
   // Determine active chapter
