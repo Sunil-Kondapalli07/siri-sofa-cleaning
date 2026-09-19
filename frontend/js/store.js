@@ -132,7 +132,7 @@ class AppStore {
 
       this.notify('services_loaded', this.services);
     } catch (e) {
-      console.warn("Backend API not reachable (using static catalog for GitHub Pages deployment):", e);
+      console.warn("Backend API not reachable (using static catalog fallback):", e);
       this.services = this.getFallbackServices();
       this.notify('services_loaded', this.services);
     }
