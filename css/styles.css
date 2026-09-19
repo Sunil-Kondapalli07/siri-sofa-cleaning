@@ -513,53 +513,76 @@ h1, h2, h3, h4, h5, h6, .font-display {
 }
 
 /* ==========================================================================
-   Next-Gen 3D WebGL Scrollytelling Styles
+   Full-Page 3D Spatial Scroll & Perspective Architecture
    ========================================================================== */
-.sofa-3d-viewport {
+html.spatial-3d-active {
+  perspective: 1200px;
+  perspective-origin: 50% 50%;
+  scroll-behavior: smooth;
+}
+
+body {
+  transform-style: preserve-3d;
+}
+
+/* Sections operate inside physical 3D space */
+section, #hero-view-container > section, #hygiene-view-container > section, #services-view-container > section {
+  transform-style: preserve-3d;
+  will-change: transform;
+  transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 3D Tilt Cards with Dynamic Lighting Glare */
+.spatial-tilt-item {
+  transform-style: preserve-3d;
   position: relative;
-  width: 100%;
-  height: 520px;
-  background: radial-gradient(circle at 50% 45%, #FFFFFF 0%, #F5F3ED 65%, #EBE6DA 100%);
-  border-radius: 1.75rem;
   overflow: hidden;
-  box-shadow: 0 24px 48px -12px rgba(12, 74, 52, 0.12), 0 4px 16px -2px rgba(18, 24, 32, 0.05);
-  border: 1px solid rgba(18, 24, 32, 0.08);
+  will-change: transform;
 }
 
-@media (max-width: 640px) {
-  .sofa-3d-viewport {
-    height: 420px;
-  }
+/* Dynamic Specular Reflection Glare */
+.spatial-glare-fx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 20;
+  border-radius: inherit;
+  mix-blend-mode: overlay;
 }
 
-.swatch-btn {
+/* 3D Depth Layering (Items that float forward in physical space) */
+.spatial-depth-1 {
+  transform: translateZ(12px);
+}
+
+.spatial-depth-2 {
+  transform: translateZ(24px);
+}
+
+.spatial-depth-3 {
+  transform: translateZ(36px);
+}
+
+/* 3D Hero Luxury Display */
+.hero-spatial-container {
+  transform-style: preserve-3d;
   position: relative;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.swatch-btn:hover {
-  transform: scale(1.15);
+.hero-floating-glass-badge {
+  transform: translateZ(32px);
+  box-shadow: 0 20px 40px -10px rgba(12, 74, 52, 0.2), 0 4px 12px rgba(18, 24, 32, 0.08);
 }
 
-.swatch-btn.swatch-active {
-  transform: scale(1.2);
-  box-shadow: 0 0 0 3px #FFFFFF, 0 0 0 5px #0C4A34;
+.hero-floating-main-card {
+  transform-style: preserve-3d;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.scrolly-phase-card {
-  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.scrolly-phase-card.active-phase {
-  border-color: #0C4A34;
-  background-color: #F2F8F5;
-  box-shadow: 0 12px 28px -6px rgba(12, 74, 52, 0.15);
-  transform: translateY(-4px);
-}
-
-.scrolly-phase-card.active-phase .phase-num {
-  background-color: #0C4A34;
-  color: #FFFFFF;
+.hero-floating-main-card:hover {
+  transform: perspective(1000px) rotateY(-4deg) rotateX(3deg) translateZ(18px);
 }
 
 /* Accessibility: Reduced motion settings */
@@ -571,6 +594,8 @@ h1, h2, h3, h4, h5, h6, .font-display {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+    transform: none !important;
   }
 }
+
 
