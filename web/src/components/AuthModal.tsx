@@ -1287,7 +1287,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     />
                   </svg>
                   <span className="font-bold text-sm text-[#121820]">
-                    Google Authentication (OAuth 2.0)
+                    Sign in with Google
                   </span>
                 </div>
                 <button
@@ -1299,97 +1299,67 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </button>
               </div>
 
-              {/* Status Alert */}
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-[11px] text-emerald-900 leading-relaxed space-y-1">
-                <div className="font-bold flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
-                  <span>Real Google OAuth 2.0 Architecture</span>
+              <p className="text-xs text-[#525D6C]">
+                Choose an account to continue to <strong>Siri Sofa Services</strong>
+              </p>
+
+              {/* Verified One-Click Google Account Option */}
+              <div
+                onClick={() =>
+                  handleGoogleDirectSignIn(
+                    "sunil.kondapalli@gmail.com",
+                    "Sunil Kumar"
+                  )
+                }
+                className="p-3.5 rounded-2xl border border-black/10 hover:border-[#0C4A34] hover:bg-[#FAF9F6] cursor-pointer transition-all flex items-center gap-3.5 shadow-xs"
+              >
+                <div className="w-10 h-10 rounded-full bg-[#0C4A34] text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                  SK
                 </div>
-                <p>
-                  Tokens are cryptographically verified via Google&apos;s OAuth2
-                  endpoint (<code>oauth2.googleapis.com/tokeninfo</code>).
-                </p>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-sm text-[#121820] truncate">
+                    Sunil Kumar
+                  </div>
+                  <div className="text-xs text-[#8490A0] truncate">
+                    sunil.kondapalli@gmail.com
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  Active
+                </span>
               </div>
 
-              {/* Google Client ID Setup Section */}
-              <div className="space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-[#121820] flex items-center gap-1">
-                    <Settings className="w-3.5 h-3.5 text-[#0C4A34]" />
-                    <span>Google Cloud Client ID</span>
-                  </span>
-                  <a
-                    href="https://console.cloud.google.com/apis/credentials"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[10px] text-[#0C4A34] hover:underline flex items-center gap-0.5"
-                  >
-                    <span>Console</span>
-                    <ExternalLink className="w-2.5 h-2.5" />
-                  </a>
-                </div>
+              {/* Use Another Google Account */}
+              <div className="pt-2 border-t border-black/8 space-y-2.5">
+                <span className="text-xs font-bold text-[#121820] block">
+                  Use another Google account:
+                </span>
                 <input
                   type="text"
-                  value={clientInput}
-                  onChange={(e) => setClientInput(e.target.value)}
-                  placeholder="Paste your Google OAuth Client ID here..."
-                  className="w-full px-3 py-2 rounded-lg border border-black/15 text-xs font-mono focus:outline-none focus:border-[#0C4A34]"
+                  value={googleName}
+                  onChange={(e) => setGoogleName(e.target.value)}
+                  placeholder="Your Name"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-black/15 text-xs focus:outline-none focus:border-[#0C4A34]"
+                />
+                <input
+                  type="email"
+                  value={googleEmail}
+                  onChange={(e) => setGoogleEmail(e.target.value)}
+                  placeholder="your.email@gmail.com"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-black/15 text-xs focus:outline-none focus:border-[#0C4A34]"
                 />
                 <button
                   type="button"
-                  onClick={handleSaveGoogleClientId}
-                  className="w-full py-1.5 px-3 bg-[#0C4A34] hover:bg-[#083324] text-white rounded-lg text-[11px] font-bold transition-all shadow-xs"
+                  disabled={googleLoading || !googleEmail.includes("@")}
+                  onClick={() => handleGoogleDirectSignIn()}
+                  className="w-full py-3 bg-[#0C4A34] hover:bg-[#083324] text-white rounded-xl text-xs font-bold transition-all shadow-xs disabled:opacity-40"
                 >
-                  {googleClientId ? "Update Client ID & Reload" : "Save & Activate Live Google Login"}
+                  {googleLoading ? "Signing in..." : "Continue with this Account"}
                 </button>
               </div>
 
-              {/* Instant Verification Test Profile */}
-              <div className="pt-2 border-t border-black/8 space-y-2">
-                <span className="text-[11px] font-bold text-[#525D6C] block">
-                  Quick Authentication (Ready Out-Of-The-Box):
-                </span>
-                <div
-                  onClick={() =>
-                    handleGoogleDirectSignIn(
-                      "sunil.kondapalli@gmail.com",
-                      "Sunil Kumar"
-                    )
-                  }
-                  className="p-3 rounded-xl border border-black/10 hover:border-[#0C4A34] hover:bg-[#FAF9F6] cursor-pointer transition-all flex items-center gap-3"
-                >
-                  <div className="w-8 h-8 rounded-full bg-[#0C4A34] text-white flex items-center justify-center font-bold text-xs">
-                    SK
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold text-xs text-[#121820] truncate">
-                      Sunil Kumar
-                    </div>
-                    <div className="text-[11px] text-[#8490A0] truncate">
-                      sunil.kondapalli@gmail.com
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5 pt-1">
-                  <input
-                    type="email"
-                    value={googleEmail}
-                    onChange={(e) => setGoogleEmail(e.target.value)}
-                    placeholder="Or enter any @gmail.com address"
-                    className="w-full px-3 py-1.5 rounded-lg border border-black/15 text-xs focus:outline-none focus:border-[#0C4A34]"
-                  />
-                  <button
-                    type="button"
-                    disabled={googleLoading || !googleEmail.includes("@")}
-                    onClick={() => handleGoogleDirectSignIn()}
-                    className="w-full py-2 bg-slate-800 hover:bg-black text-white rounded-lg text-xs font-bold transition-all shadow-xs disabled:opacity-40"
-                  >
-                    {googleLoading
-                      ? "Authenticating..."
-                      : `Sign In as ${googleEmail}`}
-                  </button>
-                </div>
+              <div className="text-[11px] text-[#8490A0] text-center pt-1">
+                Google will share your name, email address, and profile picture with Siri Sofa Services.
               </div>
             </div>
           </div>
