@@ -91,3 +91,32 @@ body {
   letter-spacing: -0.04em;
   text-transform: uppercase;
 }
+
+/* Radar & Scanner Animations */
+@keyframes laserSweep {
+  0% {
+    top: 0%;
+    opacity: 0.8;
+  }
+  50% {
+    top: 96%;
+    opacity: 1;
+  }
+  100% {
+    top: 0%;
+    opacity: 0.8;
+  }
+}
+
+.animate-laser {
+  animation: laserSweep 3.2s ease-in-out infinite;
+}
+
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+

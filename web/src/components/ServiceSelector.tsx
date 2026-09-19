@@ -3,7 +3,8 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import { Service, ServiceVariant, CartItem } from "@/types";
-import { Plus, Minus, ArrowRight, Check } from "lucide-react";
+import { Plus, Minus, ArrowRight } from "lucide-react";
+import { ScrollReveal } from "./ScrollReveal";
 
 interface ServiceSelectorProps {
   services: Service[];
@@ -80,21 +81,23 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Section Header */}
-        <div className="text-center max-w-2xl mx-auto mb-14">
-          <span className="text-[11px] font-extrabold uppercase tracking-widest text-[#0C4A34] bg-[#EBF5F0] px-3.5 py-1.5 rounded-full border border-[#C2E2D3]">
-            Doorstep Service Catalog
-          </span>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#121820] mt-3 tracking-tight">
-            Our Professional Services
-          </h2>
-          <p className="text-sm sm:text-base text-[#525D6C] mt-2">
-            Select a category to view live transparent rates and customize your configuration.
-          </p>
-        </div>
+        <ScrollReveal direction="up">
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <span className="text-[11px] font-extrabold uppercase tracking-widest text-[#0C4A34] bg-[#EBF5F0] px-3.5 py-1.5 rounded-full border border-[#C2E2D3]">
+              Doorstep Service Catalog
+            </span>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#121820] mt-3 tracking-tight">
+              Our Professional Services
+            </h2>
+            <p className="text-sm sm:text-base text-[#525D6C] mt-2">
+              Select a category to view live transparent rates and customize your configuration.
+            </p>
+          </div>
+        </ScrollReveal>
 
         {/* 4 Interactive Primary Service Showcase Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
-          {services.map((s) => {
+          {services.map((s, idx) => {
             const meta = serviceMeta[s.slug] || {
               image: "/images/service_sofa.jpg",
               badge: "Professional Care",
@@ -104,146 +107,149 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
             const isSelected = s.slug === activeSlug;
 
             return (
-              <div
-                key={s.id}
-                onClick={() => setActiveSlug(s.slug)}
-                className={`service-card cursor-pointer flex flex-col justify-between ${
-                  isSelected ? "ring-2 ring-[#0C4A34] shadow-xl" : ""
-                }`}
-              >
-                <div>
-                  <div className="relative h-48 sm:h-52 w-full overflow-hidden bg-black/5">
-                    <Image
-                      src={meta.image}
-                      alt={s.title}
-                      fill
-                      className="object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                    <span className="absolute top-3 left-3 bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] font-extrabold text-[#0C4A34] tracking-wide uppercase border border-black/5 shadow-xs z-10">
-                      {meta.badge}
-                    </span>
-                  </div>
-
-                  <div className="p-5">
-                    <h3 className="font-extrabold text-lg text-[#121820]">
-                      {s.title}
-                    </h3>
-                    <p className="text-xs text-[#525D6C] leading-relaxed line-clamp-2 mt-1">
-                      {meta.tagline}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-5 pt-0 flex items-center justify-between border-t border-black/5 mt-2">
+              <ScrollReveal key={s.id} direction="up" delay={idx * 75}>
+                <div
+                  onClick={() => setActiveSlug(s.slug)}
+                  className={`service-card cursor-pointer flex flex-col justify-between h-full ${
+                    isSelected ? "ring-2 ring-[#0C4A34] shadow-xl" : ""
+                  }`}
+                >
                   <div>
-                    <span className="text-[10px] uppercase font-bold text-[#8490A0] block">
-                      Starting from
-                    </span>
-                    <span className="font-extrabold text-base text-[#0C4A34]">
-                      {meta.startPrice}
-                    </span>
+                    <div className="relative h-48 sm:h-52 w-full overflow-hidden bg-black/5">
+                      <Image
+                        src={meta.image}
+                        alt={s.title}
+                        fill
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                      <span className="absolute top-3 left-3 bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] font-extrabold text-[#0C4A34] tracking-wide uppercase border border-black/5 shadow-xs z-10">
+                        {meta.badge}
+                      </span>
+                    </div>
+
+                    <div className="p-5">
+                      <h3 className="font-extrabold text-lg text-[#121820]">
+                        {s.title}
+                      </h3>
+                      <p className="text-xs text-[#525D6C] leading-relaxed line-clamp-2 mt-1">
+                        {meta.tagline}
+                      </p>
+                    </div>
                   </div>
-                  <div
-                    className={`flex items-center gap-1 text-xs font-bold ${
-                      isSelected ? "text-[#0C4A34]" : "text-[#121820]"
-                    }`}
-                  >
-                    <span>{isSelected ? "Selected" : "Configure"}</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+
+                  <div className="p-5 pt-0 flex items-center justify-between border-t border-black/5 mt-2">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-[#8490A0] block">
+                        Starting from
+                      </span>
+                      <span className="font-extrabold text-base text-[#0C4A34]">
+                        {meta.startPrice}
+                      </span>
+                    </div>
+                    <div
+                      className={`flex items-center gap-1 text-xs font-bold ${
+                        isSelected ? "text-[#0C4A34]" : "text-[#121820]"
+                      }`}
+                    >
+                      <span>{isSelected ? "Selected" : "Configure"}</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </div>
                   </div>
                 </div>
-              </div>
+              </ScrollReveal>
             );
           })}
         </div>
 
         {/* Active Category Detailed Variants Customizer */}
         {currentService && (
-          <div className="bg-white rounded-3xl p-6 sm:p-10 border border-black/8 shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-black/5 mb-8">
-              <div>
-                <div className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider text-[#0C4A34]">
-                  <span>Catalog Configuration</span>
-                  <span>•</span>
-                  <span>{currentService.title}</span>
-                </div>
-                <h3 className="text-2xl font-black text-[#121820] mt-1">
-                  Customize Your {currentService.title}
-                </h3>
-                <p className="text-xs text-[#525D6C] mt-0.5">
-                  {currentService.description}
-                </p>
-              </div>
-              <div className="text-left sm:text-right">
-                <span className="text-[11px] font-bold text-emerald-700 bg-[#EBF5F0] px-3 py-1 rounded-full border border-[#C2E2D3]">
-                  ✓ Verified Transparent Pricing
-                </span>
-              </div>
-            </div>
-
-            {/* Variants Cards Grid with Steppers */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {(currentService.variants || []).map((v) => {
-                const qty = getItemQuantity(v.id);
-                const isAdded = qty > 0;
-
-                return (
-                  <div
-                    key={v.id}
-                    className={`p-5 rounded-2xl border ${
-                      isAdded
-                        ? "border-[#0C4A34] bg-[#EBF5F0]/25 shadow-sm"
-                        : "border-black/8 bg-white hover:border-black/20"
-                    } transition-all flex flex-col justify-between`}
-                  >
-                    <div>
-                      <div className="flex items-start justify-between gap-2 mb-1.5">
-                        <h4 className="font-bold text-base text-[#121820]">
-                          {v.name}
-                        </h4>
-                        <span className="px-2 py-0.5 rounded-full bg-[#F4F2EC] text-[#525D6C] text-[10px] font-bold whitespace-nowrap">
-                          ~{v.estimated_minutes} min
-                        </span>
-                      </div>
-                      <div className="flex items-baseline gap-1.5 mb-4">
-                        <span className="text-xl font-black text-[#0C4A34]">
-                          ₹{v.base_price}
-                        </span>
-                        <span className="text-xs text-[#8490A0] font-medium">
-                          / {v.unit_type}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Stepper Control */}
-                    <div className="flex items-center justify-between pt-4 border-t border-black/5">
-                      <span className="text-xs font-semibold text-[#525D6C]">
-                        Quantity
-                      </span>
-                      <div className="flex items-center gap-2.5 bg-[#F4F2EC] p-1 rounded-xl">
-                        <button
-                          onClick={() => onUpdateQuantity(v, qty - 1)}
-                          disabled={qty === 0}
-                          className="w-7 h-7 rounded-lg bg-white text-[#121820] font-bold text-sm flex items-center justify-center hover:bg-black/5 transition-colors shadow-xs disabled:opacity-30 cursor-pointer"
-                        >
-                          <Minus className="w-3.5 h-3.5" />
-                        </button>
-                        <span className="w-6 text-center font-bold text-[#121820] text-sm">
-                          {qty}
-                        </span>
-                        <button
-                          onClick={() => onUpdateQuantity(v, qty + 1)}
-                          className="w-7 h-7 rounded-lg bg-[#0C4A34] text-white font-bold text-sm flex items-center justify-center hover:bg-[#083827] transition-colors shadow-xs cursor-pointer"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
+          <ScrollReveal direction="up" delay={150}>
+            <div className="bg-white rounded-3xl p-6 sm:p-10 border border-black/8 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-black/5 mb-8">
+                <div>
+                  <div className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider text-[#0C4A34]">
+                    <span>Catalog Configuration</span>
+                    <span>•</span>
+                    <span>{currentService.title}</span>
                   </div>
-                );
-              })}
+                  <h3 className="text-2xl font-black text-[#121820] mt-1">
+                    Customize Your {currentService.title}
+                  </h3>
+                  <p className="text-xs text-[#525D6C] mt-0.5">
+                    {currentService.description}
+                  </p>
+                </div>
+                <div className="text-left sm:text-right">
+                  <span className="text-[11px] font-bold text-emerald-700 bg-[#EBF5F0] px-3 py-1 rounded-full border border-[#C2E2D3]">
+                    ✓ Verified Transparent Pricing
+                  </span>
+                </div>
+              </div>
+
+              {/* Variants Cards Grid with Steppers */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {(currentService.variants || []).map((v) => {
+                  const qty = getItemQuantity(v.id);
+                  const isAdded = qty > 0;
+
+                  return (
+                    <div
+                      key={v.id}
+                      className={`p-5 rounded-2xl border ${
+                        isAdded
+                          ? "border-[#0C4A34] bg-[#EBF5F0]/25 shadow-sm"
+                          : "border-black/8 bg-white hover:border-black/20"
+                      } transition-all flex flex-col justify-between`}
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-2 mb-1.5">
+                          <h4 className="font-bold text-base text-[#121820]">
+                            {v.name}
+                          </h4>
+                          <span className="px-2 py-0.5 rounded-full bg-[#F4F2EC] text-[#525D6C] text-[10px] font-bold whitespace-nowrap">
+                            ~{v.estimated_minutes} min
+                          </span>
+                        </div>
+                        <div className="flex items-baseline gap-1.5 mb-4">
+                          <span className="text-xl font-black text-[#0C4A34]">
+                            ₹{v.base_price}
+                          </span>
+                          <span className="text-xs text-[#8490A0] font-medium">
+                            / {v.unit_type}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Stepper Control */}
+                      <div className="flex items-center justify-between pt-4 border-t border-black/5">
+                        <span className="text-xs font-semibold text-[#525D6C]">
+                          Quantity
+                        </span>
+                        <div className="flex items-center gap-2.5 bg-[#F4F2EC] p-1 rounded-xl">
+                          <button
+                            onClick={() => onUpdateQuantity(v, qty - 1)}
+                            disabled={qty === 0}
+                            className="w-7 h-7 rounded-lg bg-white text-[#121820] font-bold text-sm flex items-center justify-center hover:bg-black/5 transition-colors shadow-xs disabled:opacity-30 cursor-pointer"
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+                          <span className="w-6 text-center font-bold text-[#121820] text-sm">
+                            {qty}
+                          </span>
+                          <button
+                            onClick={() => onUpdateQuantity(v, qty + 1)}
+                            className="w-7 h-7 rounded-lg bg-[#0C4A34] text-white font-bold text-sm flex items-center justify-center hover:bg-[#083827] transition-colors shadow-xs cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          </ScrollReveal>
         )}
 
         {/* Floating Sticky Booking Bar When Items Selected */}

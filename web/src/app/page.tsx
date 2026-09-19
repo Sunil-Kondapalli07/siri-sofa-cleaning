@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { Service, ServiceVariant, CartItem, User } from "@/types";
 import { api } from "@/lib/api";
+import { ScrollProgress } from "@/components/ScrollProgress";
+import { SectionNavigator } from "@/components/SectionNavigator";
 import { Navbar } from "@/components/Navbar";
 import { Hero } from "@/components/Hero";
 import { EmotionalStory } from "@/components/EmotionalStory";
@@ -85,7 +87,13 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAF9F6] selection:bg-[#0C4A34] selection:text-white">
+    <div className="min-h-screen flex flex-col bg-[#FAF9F6] selection:bg-[#0C4A34] selection:text-white relative">
+      {/* Top Scroll Reading Depth Progress Bar */}
+      <ScrollProgress />
+
+      {/* Floating Active Section Pill & Smooth Jump Navigator */}
+      <SectionNavigator />
+
       {/* Navigation Bar */}
       <Navbar
         user={user}
@@ -98,7 +106,7 @@ export default function Home() {
 
       {/* Main Content Sections */}
       <main className="flex-1">
-        {/* 1. Cinematic Luxury Penthouse Hero */}
+        {/* 1. Cinematic Luxury Penthouse Hero with Atmosphere & Hotspots */}
         <Hero
           onBookNow={() => setIsBookingOpen(true)}
           onExploreServices={() => {
