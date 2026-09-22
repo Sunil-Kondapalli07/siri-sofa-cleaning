@@ -291,6 +291,40 @@ export const api = {
     return data;
   },
 
+  async createRazorpayOrder(bookingId: string) {
+    const res = await fetchApi("/api/payments/razorpay/order", {
+      method: "POST", headers: getHeaders(), body: JSON.stringify({ booking_id: bookingId })
+    });
+    return await res.json();
+  },
+
+  async verifyRazorpayPayment(payload: {
+    booking_id: string;
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }) {
+    const res = await fetchApi("/api/payments/razorpay/verify", {
+      method: "POST", headers: getHeaders(), body: JSON.stringify(payload)
+    });
+    return await res.json();
+  },
+
+  async metaLogin(access_token: string) {
+    const res = await fetchApi("/api/auth/meta", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ access_token })
+    });
+    const data = await res.json();
+    if (data.token && data.user && typeof window !== "undefined") {
+      localStorage.setItem("siri_auth_token", data.token);
+      localStorage.setItem("siri_token", data.token);
+      localStorage.setItem("siri_user_profile", JSON.stringify(data.user));
+      localStorage.setItem("siri_user", JSON.stringify(data.user));
+    }
+    return data;
+  },
+
   async logout() {
     try {
       await fetchApi("/api/auth/logout", {
