@@ -915,9 +915,9 @@ const App = {
       emailVerified: false,
       mobileInterval: null,
       emailInterval: null,
-      devCodes: {
-        mobile: res.dev_mobile_code || null,
-        email: res.dev_email_code || null
+      challenges: {
+        mobile: res.mobile_challenge_id || null,
+        email: res.email_challenge_id || null
       }
     };
 
@@ -938,20 +938,13 @@ const App = {
     if (eErr) eErr.classList.add('hidden');
 
     if (noticeBox) {
-      if (res.dev_mobile_code || res.dev_email_code) {
+      if (res.mobile_delivered === false || res.email_delivered === false) {
         noticeBox.className = 'mb-5 p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-left flex items-start gap-3';
         noticeBox.innerHTML = `
-          <span class="text-xl">🛡️</span>
+          <span class="text-xl">⚠️</span>
           <div class="text-xs text-amber-900 leading-tight flex-1">
-            <div class="font-bold text-slate-900">Security Verification Codes Generated</div>
-            <p class="text-[11px] text-amber-800 mt-1">
-              ${res.mobile_delivered ? '✅ SMS code delivered live to your mobile.' : 'ℹ️ Live SMS gateway is unconfigured in .env (FAST2SMS_API_KEY required for live carrier delivery).'}
-            </p>
-            <div class="mt-2.5 p-2.5 bg-white rounded-xl border border-amber-200 flex flex-wrap gap-4 font-mono text-xs shadow-sm">
-              ${res.dev_mobile_code ? `<div>📱 Mobile SMS Code: <span class="bg-amber-100 text-slate-950 px-2 py-0.5 rounded font-black tracking-wider">${res.dev_mobile_code}</span></div>` : '<div>📱 Mobile SMS: <span class="text-emerald-700 font-bold">Live Sent</span></div>'}
-              ${res.dev_email_code ? `<div>✉️ Email Code: <span class="bg-amber-100 text-slate-950 px-2 py-0.5 rounded font-black tracking-wider">${res.dev_email_code}</span></div>` : '<div>✉️ Email: <span class="text-emerald-700 font-bold">Live Sent</span></div>'}
-            </div>
-            <div class="text-[10px] text-amber-700 font-semibold mt-1.5">* You must enter these exact codes. Random codes will be rejected.</div>
+            <div class="font-bold text-slate-900">Verification delivery needs attention</div>
+            <p class="text-[11px] text-amber-800 mt-1">Check your SMS/email provider configuration. Verification codes are never displayed in this application.</p>
           </div>
         `;
       } else {
@@ -1055,6 +1048,7 @@ const App = {
 
     try {
       const res = await ApiClient.sendOtp(target, channel, this.signupPending.user?.id);
+      this.signupPending.challenges[channel] = res.challenge_id;
       this.startSignupCooldown(channel, 30);
       if (res && res.dev_code) {
         if (!this.signupPending.devCodes) this.signupPending.devCodes = {};
@@ -1114,7 +1108,7 @@ const App = {
     }
 
     try {
-      await ApiClient.verifyOtp(this.signupPending.phone, 'mobile', code, this.signupPending.user?.id);
+      await ApiClient.verifyOtp(this.signupPending.challenges.mobile, 'mobile', code);
       this.signupPending.mobileVerified = true;
 
       // Update UI for Mobile card
@@ -1169,7 +1163,7 @@ const App = {
     }
 
     try {
-      await ApiClient.verifyOtp(this.signupPending.email, 'email', code, this.signupPending.user?.id);
+      await ApiClient.verifyOtp(this.signupPending.challenges.email, 'email', code);
       this.signupPending.emailVerified = true;
 
       // Update UI for Email card
