@@ -78,7 +78,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [emailChallenge, setEmailChallenge] = useState("");
   const [mobileOtp, setMobileOtp] = useState("");
   const [emailOtp, setEmailOtp] = useState("");
-  const [devOtpHint, setDevOtpHint] = useState<string | null>(null);
 
   // Forgot Password flow states
   const [forgotTarget, setForgotTarget] = useState("");
@@ -86,7 +85,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [forgotOtp, setForgotOtp] = useState("");
   const [forgotNewPassword, setForgotNewPassword] = useState("");
   const [forgotConfirmPassword, setForgotConfirmPassword] = useState("");
-  const [forgotDevOtp, setForgotDevOtp] = useState<string | null>(null);
 
   // Google OAuth 2.0 / GIS states
   const [googleClientId] = useState<string>(() => {
@@ -325,13 +323,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           setRequiresOtp(true);
           setMobileChallenge(res.mobile_challenge_id || "");
           setEmailChallenge(res.email_challenge_id || "");
-          const hint =
-            res.dev_mobile_otp || res.dev_email_otp || res.dev_otp_hint;
-          if (hint) {
-            setDevOtpHint(hint);
-            setMobileOtp(res.dev_mobile_otp || hint);
-            setEmailOtp(res.dev_email_otp || hint);
-          }
         } else {
           onLoginSuccess(res.user);
           onClose();
@@ -418,10 +409,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const res = await api.requestPasswordReset(target);
       if (res.success && res.challenge_id) {
         setForgotChallengeId(res.challenge_id);
-        setForgotDevOtp(res.dev_otp_hint || null);
-        if (res.dev_otp_hint) {
-          setForgotOtp(res.dev_otp_hint);
-        }
         setSuccessMessage(
           res.message || `Verification code dispatched to ${target}.`
         );
@@ -626,30 +613,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 We sent verification codes to your mobile phone and email. Please enter
                 either 6-digit code below to activate your account.
               </p>
-
-              {devOtpHint && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>
-                      Demo Code:{" "}
-                      <strong className="font-mono text-sm tracking-wider">
-                        {devOtpHint}
-                      </strong>
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMobileOtp(devOtpHint);
-                      setEmailOtp(devOtpHint);
-                    }}
-                    className="px-2.5 py-1 bg-[#0C4A34] text-white rounded-lg text-[10px] font-bold"
-                  >
-                    Auto-Fill
-                  </button>
-                </div>
-              )}
 
               <div>
                 <label className="block text-xs font-bold text-[#121820] mb-1">
@@ -1142,27 +1105,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <ShieldCheck className="w-4 h-4 text-[#0C4A34]" />
                 <span>Set New Password</span>
               </div>
-
-              {forgotDevOtp && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>
-                      Demo Reset Code:{" "}
-                      <strong className="font-mono text-sm tracking-wider">
-                        {forgotDevOtp}
-                      </strong>
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setForgotOtp(forgotDevOtp)}
-                    className="px-2.5 py-1 bg-[#0C4A34] text-white rounded-lg text-[10px] font-bold"
-                  >
-                    Auto-Fill
-                  </button>
-                </div>
-              )}
 
               <div>
                 <label className="block text-xs font-bold text-[#121820] mb-1">
