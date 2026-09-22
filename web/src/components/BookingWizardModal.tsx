@@ -236,50 +236,85 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   const handleSubmitBooking = async () => {
     if (isSubmitting) return;
 
-    // Check authentication
     const token = localStorage.getItem("siri_auth_token") || localStorage.getItem("siri_token");
     if (!token && !user) {
       setSubmitError("Please sign in or create an account to schedule your appointment.");
-      if (onOpenAuth) onOpenAuth();
+      onOpenAuth?.();
+      return;
+    }
+    if (!serviceDate || !serviceSlot || cart.length === 0) {
+      setSubmitError("Please complete the service, date and time details.");
       return;
     }
 
     setSubmitError("");
     setIsSubmitting(true);
-
     try {
       const payload = {
-        name,
-        phone,
-        email,
+        name: name.trim(),
+        phone: phone.replace(/\+91|\s|-/g, ""),
+        email: email.trim().toLowerCase(),
         service_date: serviceDate,
-        service_slot: serviceSlot || (slots.find(s => s.available)?.slot || "09:00 AM"),
-        items: cart.map((it) => ({
-          variant_id: it.variant.id,
-          quantity: it.quantity,
-        })),
+        service_slot: serviceSlot,
+        items: cart.map((it) => ({ variant_id: it.variant.id, quantity: it.quantity })),
         coupon_code: couponApplied ? couponCode.trim().toUpperCase() : undefined,
-        address: {
-          house_flat: houseFlat,
-          street: street,
-          area: area,
-          city: "Hyderabad",
-          pincode: pincode,
-          instructions: instructions,
-        },
+        address: { house_flat: houseFlat.trim(), street: street.trim(), area, city: "Hyderabad", pincode: pincode.trim(), instructions },
         notes: instructions,
         payment_method: paymentMethod,
       };
 
       const res = await api.createBooking(payload);
-      if (res.success && res.booking_id) {
-        setCompletedBookingId(res.booking_id);
-        onBookingSuccess(res.booking_id);
-      } else {
-        setSubmitError(res.error || "Failed to schedule booking. Please check details and try again.");
+      if (!res.success || !res.booking_id) {
+        throw new Error(res.error || "Unable to create booking.");
       }
+
+      const bookingId = String(res.booking_id);
+
+      if (paymentMethod === "razorpay") {
+        const order = await api.createRazorpayOrder(bookingId);
+        if (!order?.success || !order?.order_id) {
+          throw new Error(order?.error || "Unable to start Razorpay payment. Please try Cash on Delivery.");
+        }
+
+        const RazorpayCtor = (window as any).Razorpay;
+        if (!RazorpayCtor) {
+          throw new Error("Razorpay checkout is not loaded. Please refresh the page or use Cash on Delivery.");
+        }
+
+        await new Promise<void>((resolve, reject) => {
+          const checkout = new RazorpayCtor({
+            key: order.key_id,
+            amount: order.amount,
+            currency: order.currency || "INR",
+            name: "Siri Sofa Services",
+            description: "Sofa & upholstery cleaning",
+            order_id: order.order_id,
+            prefill: { name: name.trim(), email: email.trim(), contact: phone.replace(/\+91|\s|-/g, "") },
+            theme: { color: "#0C4A34" },
+            handler: async (response: any) => {
+              try {
+                const verified = await api.verifyRazorpayPayment({
+                  booking_id: bookingId,
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                });
+                if (!verified?.success) throw new Error(verified?.error || "Payment verification failed.");
+                resolve();
+              } catch (e) {
+                reject(e);
+              }
+            },
+            modal: { ondismiss: () => reject(new Error("Payment cancelled. Your booking remains pending payment.")) },
+          });
+          checkout.open();
+        });
+      }
+
+      setCompletedBookingId(bookingId);
+      onBookingSuccess(bookingId);
     } catch (err: unknown) {
-      setSubmitError(err instanceof Error ? err.message : "Booking submission error");
+      setSubmitError(err instanceof Error ? err.message : "Booking submission failed.");
     } finally {
       setIsSubmitting(false);
     }
