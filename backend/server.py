@@ -113,8 +113,9 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
             content_length = int(self.headers.get('Content-Length', 0))
             if content_length == 0:
                 return {}
-            raw_body = self.rfile.read(content_length).decode('utf-8')
-            return json.loads(raw_body)
+            raw_bytes = self.rfile.read(content_length)
+            self._last_raw_body = raw_bytes
+            return json.loads(raw_bytes.decode('utf-8'))
         except Exception:
             return {}
 
@@ -1121,6 +1122,106 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 except Exception as b_err:
                     cursor.execute("ROLLBACK")
                     raise b_err
+
+            # POST /api/payments/razorpay/order
+            elif path == '/api/payments/razorpay/order':
+                caller = self.get_authenticated_user(conn)
+                if not caller:
+                    return self.send_json(401, {'error': 'Authentication required'})
+                booking_id = str(payload.get('booking_id', '')).strip()
+                if not booking_id:
+                    return self.send_json(400, {'error': 'booking_id is required'})
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM bookings WHERE id=?", (booking_id,))
+                booking = cursor.fetchone()
+                if not booking:
+                    return self.send_json(404, {'error': 'Booking not found'})
+                if caller['role'] != 'admin' and str(booking['user_id']) != str(caller['id']):
+                    return self.send_json(403, {'error': 'Access denied'})
+                key_id = os.environ.get('RAZORPAY_KEY_ID', '').strip()
+                key_secret = os.environ.get('RAZORPAY_KEY_SECRET', '').strip()
+                if not key_id or not key_secret:
+                    return self.send_json(503, {'error': 'Razorpay is not configured. COD remains available.'})
+                amount_paise = int(round(float(booking['total_amount']) * 100))
+                import base64
+                auth = base64.b64encode(f"{key_id}:{key_secret}".encode()).decode()
+                req = urllib.request.Request(
+                    "https://api.razorpay.com/v1/orders",
+                    data=json.dumps({'amount': amount_paise, 'currency': 'INR', 'receipt': booking_id}).encode(),
+                    headers={'Content-Type':'application/json','Authorization':f'Basic {auth}'}, method='POST')
+                try:
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        order = json.loads(resp.read().decode())
+                except Exception as e:
+                    return self.send_json(502, {'error': 'Unable to create Razorpay order'})
+                cursor.execute("UPDATE bookings SET payment_method='razorpay', payment_gateway_order_id=?, payment_status='created', updated_at=? WHERE id=?",
+                               (order.get('id'), now, booking_id))
+                cursor.execute("""INSERT INTO payments(booking_id,provider,order_id,amount,currency,status,created_at,updated_at)
+                                  VALUES(?,?,?,?,?,?,?,?)
+                                  ON CONFLICT(booking_id) DO UPDATE SET order_id=excluded.order_id,status='created',updated_at=excluded.updated_at""",
+                               (booking_id,'razorpay',order.get('id'),float(booking['total_amount']),'INR','created',now,now))
+                conn.commit()
+                return self.send_json(200, {'success':True,'key_id':key_id,'order_id':order.get('id'),'amount':amount_paise,'currency':'INR','booking_id':booking_id})
+
+            # POST /api/payments/razorpay/verify
+            elif path == '/api/payments/razorpay/verify':
+                caller = self.get_authenticated_user(conn)
+                if not caller:
+                    return self.send_json(401, {'error':'Authentication required'})
+                booking_id = str(payload.get('booking_id','')).strip()
+                order_id = str(payload.get('razorpay_order_id','')).strip()
+                payment_id = str(payload.get('razorpay_payment_id','')).strip()
+                signature = str(payload.get('razorpay_signature','')).strip()
+                if not all([booking_id, order_id, payment_id, signature]):
+                    return self.send_json(400, {'error':'Incomplete payment verification payload'})
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM bookings WHERE id=?", (booking_id,))
+                booking = cursor.fetchone()
+                if not booking:
+                    return self.send_json(404, {'error':'Booking not found'})
+                if caller['role'] != 'admin' and str(booking['user_id']) != str(caller['id']):
+                    return self.send_json(403, {'error':'Access denied'})
+                if order_id != (booking['payment_gateway_order_id'] or ''):
+                    return self.send_json(400, {'error':'Payment order mismatch'})
+                key_secret = os.environ.get('RAZORPAY_KEY_SECRET','').strip()
+                if not key_secret:
+                    return self.send_json(503, {'error':'Razorpay is not configured'})
+                expected = hmac.new(key_secret.encode(), f"{order_id}|{payment_id}".encode(), __import__('hashlib').sha256).hexdigest()
+                if not hmac.compare_digest(expected, signature):
+                    return self.send_json(400, {'error':'Invalid payment signature'})
+                cursor.execute("UPDATE bookings SET payment_status='paid', payment_gateway_payment_id=?, updated_at=? WHERE id=?",(payment_id,now,booking_id))
+                cursor.execute("UPDATE payments SET payment_id=?,status='paid',updated_at=? WHERE booking_id=?",(payment_id,now,booking_id))
+                conn.commit()
+                return self.send_json(200, {'success':True,'payment_status':'paid','booking_id':booking_id})
+
+            # POST /api/payments/razorpay/webhook
+            elif path == '/api/payments/razorpay/webhook':
+                secret = os.environ.get('RAZORPAY_WEBHOOK_SECRET','').strip()
+                signature = self.headers.get('X-Razorpay-Signature','')
+                if not secret or not signature:
+                    return self.send_json(503, {'error':'Razorpay webhook is not configured'})
+                raw = getattr(self, '_last_raw_body', json.dumps(payload,separators=(',',':')).encode())
+                expected = hmac.new(secret.encode(), raw, __import__('hashlib').sha256).hexdigest()
+                if not hmac.compare_digest(expected, signature):
+                    return self.send_json(401, {'error':'Invalid webhook signature'})
+                event_id = self.headers.get('X-Razorpay-Event-Id','') or payload.get('event_id','')
+                if not event_id:
+                    return self.send_json(400, {'error':'Missing webhook event id'})
+                cursor = conn.cursor()
+                try:
+                    cursor.execute("INSERT INTO payment_events(provider,event_id,event_type,payload,created_at) VALUES('razorpay',?,?,?,?)",
+                                   (event_id,payload.get('event'),json.dumps(payload),now))
+                except sqlite3.IntegrityError:
+                    return self.send_json(200, {'success':True,'duplicate':True})
+                entity = ((payload.get('payload') or {}).get('payment') or {}).get('entity') or {}
+                payment_id, order_id = entity.get('id'), entity.get('order_id')
+                event = payload.get('event','')
+                new_status = 'paid' if event in ('payment.captured','order.paid') else ('failed' if event=='payment.failed' else 'created')
+                if order_id:
+                    cursor.execute("UPDATE bookings SET payment_status=?,payment_gateway_payment_id=COALESCE(?,payment_gateway_payment_id),updated_at=? WHERE payment_gateway_order_id=?",(new_status,payment_id,now,order_id))
+                    cursor.execute("UPDATE payments SET status=?,payment_id=COALESCE(?,payment_id),updated_at=? WHERE order_id=?",(new_status,payment_id,now,order_id))
+                conn.commit()
+                return self.send_json(200, {'success':True})
 
             # POST /api/reviews (Authenticated, completed booking, and anti-tamper)
             elif path == '/api/reviews':
