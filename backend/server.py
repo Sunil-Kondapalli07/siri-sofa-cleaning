@@ -1128,7 +1128,7 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                             id, user_id, customer_name, customer_email, customer_phone, address_json,
                             service_date, service_slot, status, subtotal, service_charge, tax, discount,
                             coupon_code, total_amount, payment_method, payment_status, notes, created_at, updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'received', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'received', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
                         booking_id, user_id, name, email, phone, json.dumps(address_data),
                         service_date, service_slot, subtotal, service_charge, tax, discount,
