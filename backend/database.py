@@ -186,12 +186,42 @@ def init_db(db_path: str = DB_PATH):
         discount REAL DEFAULT 0.0,
         coupon_code TEXT,
         total_amount REAL NOT NULL,
+        payment_method TEXT NOT NULL DEFAULT 'cod',
+        payment_status TEXT NOT NULL DEFAULT 'pending',
+        payment_gateway_order_id TEXT,
+        payment_gateway_payment_id TEXT,
         technician_id INTEGER,
         notes TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         FOREIGN KEY (technician_id) REFERENCES technicians(id) ON DELETE SET NULL,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS payments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        booking_id TEXT NOT NULL UNIQUE,
+        provider TEXT NOT NULL DEFAULT 'razorpay',
+        order_id TEXT,
+        payment_id TEXT,
+        amount REAL NOT NULL,
+        currency TEXT NOT NULL DEFAULT 'INR',
+        status TEXT NOT NULL DEFAULT 'created',
+        method TEXT,
+        raw_response TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS payment_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        provider TEXT NOT NULL,
+        event_id TEXT,
+        event_type TEXT,
+        payload TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE(provider, event_id)
     );
 
     CREATE TABLE IF NOT EXISTS booking_items (
@@ -225,6 +255,16 @@ def init_db(db_path: str = DB_PATH):
     );
     """)
     # Migrations for existing DB instances
+    for statement in [
+        "ALTER TABLE bookings ADD COLUMN payment_method TEXT NOT NULL DEFAULT 'cod'",
+        "ALTER TABLE bookings ADD COLUMN payment_status TEXT NOT NULL DEFAULT 'pending'",
+        "ALTER TABLE bookings ADD COLUMN payment_gateway_order_id TEXT",
+        "ALTER TABLE bookings ADD COLUMN payment_gateway_payment_id TEXT"
+    ]:
+        try:
+            cursor.execute(statement)
+        except Exception:
+            pass
     try:
         cursor.execute("ALTER TABLE users ADD COLUMN is_email_verified INTEGER DEFAULT 0")
     except Exception:
