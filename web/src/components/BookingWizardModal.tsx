@@ -66,6 +66,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [completedBookingId, setCompletedBookingId] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "razorpay">("cod");
 
   const activeServices = (services && services.length > 0) ? services : DEFAULT_SERVICES;
   const [activeCatalogCategory, setActiveCatalogCategory] = useState<string>("sofa");
@@ -267,6 +268,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
           instructions: instructions,
         },
         notes: instructions,
+        payment_method: paymentMethod,
       };
 
       const res = await api.createBooking(payload);
@@ -907,6 +909,52 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                     )}
                   </div>
 
+                  {/* Payment Method */}
+                  <div className="bg-white p-4 rounded-2xl border border-black/10 space-y-3">
+                    <div>
+                      <h4 className="text-sm font-black text-[#121820]">Payment Method</h4>
+                      <p className="text-[11px] text-[#525D6C] mt-0.5">Choose how you want to pay for this booking.</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod("cod")}
+                        className={`text-left p-3 rounded-xl border-2 transition-all ${paymentMethod === "cod" ? "border-[#0C4A34] bg-[#EBF5F0]" : "border-black/10 bg-white hover:border-black/20"}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${paymentMethod === "cod" ? "border-[#0C4A34]" : "border-gray-400"}`}>
+                            {paymentMethod === "cod" && <span className="w-2 h-2 rounded-full bg-[#0C4A34]" />}
+                          </span>
+                          <span className="font-black text-sm text-[#121820]">Cash on Delivery</span>
+                        </div>
+                        <p className="text-[10px] text-[#525D6C] mt-1.5 ml-6">Pay after the cleaning/service is completed.</p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod("razorpay")}
+                        className={`text-left p-3 rounded-xl border-2 transition-all ${paymentMethod === "razorpay" ? "border-[#0C4A34] bg-[#EBF5F0]" : "border-black/10 bg-white hover:border-black/20"}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${paymentMethod === "razorpay" ? "border-[#0C4A34]" : "border-gray-400"}`}>
+                            {paymentMethod === "razorpay" && <span className="w-2 h-2 rounded-full bg-[#0C4A34]" />}
+                          </span>
+                          <span className="font-black text-sm text-[#121820]">Online Payment</span>
+                        </div>
+                        <p className="text-[10px] text-[#525D6C] mt-1.5 ml-6">Razorpay: UPI, cards and net banking when configured.</p>
+                      </button>
+                    </div>
+                    {paymentMethod === "cod" && (
+                      <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-[11px] font-semibold text-emerald-900">
+                        ✓ Cash on Delivery selected. Your booking will be confirmed without requiring payment now.
+                      </div>
+                    )}
+                    {paymentMethod === "razorpay" && (
+                      <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-[11px] font-semibold text-blue-900">
+                        Online payment will open securely after your booking is created. If Razorpay is not configured, you can switch back to Cash on Delivery.
+                      </div>
+                    )}
+                  </div>
+
                   {/* Price Summary Breakdown */}
                   <div className="space-y-2 text-xs text-[#525D6C] border-t border-black/5 pt-3">
                     <div className="flex justify-between">
@@ -935,7 +983,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
 
                   <div className="bg-[#EBF5F0] p-3.5 rounded-xl border border-[#C2E2D3] flex items-center gap-2 text-[11px] text-[#0C4A34] font-semibold">
                     <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>Zero prepayment required. Inspect your furniture and pay only after 100% satisfaction.</span>
+                    <span>{paymentMethod === "cod" ? "Cash on Delivery selected — no online payment is required to confirm this booking." : "Online payment selected — you will be redirected to the secure Razorpay checkout."}</span>
                   </div>
 
                   {submitError && (
