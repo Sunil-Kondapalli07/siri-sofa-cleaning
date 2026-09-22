@@ -198,9 +198,6 @@ export const api = {
     requires_verification?: boolean;
     mobile_challenge_id?: string;
     email_challenge_id?: string;
-    dev_otp_hint?: string;
-    dev_mobile_otp?: string;
-    dev_email_otp?: string;
     error?: string;
   }> {
     const res = await fetchApi("/api/auth/register", {
@@ -238,7 +235,6 @@ export const api = {
     challenge_id?: string;
     target?: string;
     message?: string;
-    dev_otp_hint?: string;
     error?: string;
   }> {
     const res = await fetchApi("/api/auth/password/reset-request", {
