@@ -1028,6 +1028,9 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 items = payload.get('items', [])
                 coupon_code = payload.get('coupon_code', '').strip().upper() or None
                 notes = payload.get('notes', '')
+        payment_method = str(payload.get('payment_method', 'cod')).lower().strip()
+        if payment_method not in ('cod', 'razorpay'):
+            return self.send_json(400, {'error': 'Invalid payment method'})
 
                 if not name or not phone or not service_date or not service_slot or not items:
                     return self.send_json(400, {'error': 'Missing required booking details'})
@@ -1132,7 +1135,7 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     """, (
                         booking_id, user_id, name, email, phone, json.dumps(address_data),
                         service_date, service_slot, subtotal, service_charge, tax, discount,
-                        coupon_code, total_amount, 'cod', 'pending', notes, now, now
+                        coupon_code, total_amount, payment_method, payment_status, notes, now, now
                     ))
 
                     cursor.execute("""
