@@ -790,8 +790,7 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     'target': dest,
                     'target_type': target_type,
                     'user_id': user['id'],
-                    'message': f'A 6-digit password reset code has been sent to {dest}',
-                    'dev_otp_hint': otp_code if not dispatch_res['delivered'] else None
+                    'message': f'A 6-digit password reset code has been sent to {dest}'
                 })
 
             # POST /api/auth/password/reset
