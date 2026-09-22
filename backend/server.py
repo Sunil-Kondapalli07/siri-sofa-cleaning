@@ -985,6 +985,12 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
 
                 if not name or not phone or not service_date or not service_slot or not items:
                     return self.send_json(400, {'error': 'Missing required booking details'})
+                if not validate_service_slot(service_date, service_slot):
+                    return self.send_json(400, {'error': 'Invalid or unavailable service date/time slot'})
+                normalized_phone = normalize_phone(phone)
+                if len(normalized_phone) != 10 or not normalized_phone.isdigit() or normalized_phone[0] not in '6789':
+                    return self.send_json(400, {'error': 'Enter a valid 10-digit Indian mobile number'})
+                phone = normalized_phone
 
                 # Atomic Slot Capacity Check & Reservation using BEGIN IMMEDIATE transaction
                 conn.isolation_level = None
@@ -1075,12 +1081,12 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                         INSERT INTO bookings (
                             id, user_id, customer_name, customer_email, customer_phone, address_json,
                             service_date, service_slot, status, subtotal, service_charge, tax, discount,
-                            coupon_code, total_amount, notes, created_at, updated_at
+                            coupon_code, total_amount, payment_method, payment_status, notes, created_at, updated_at
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'received', ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
                         booking_id, user_id, name, email, phone, json.dumps(address_data),
                         service_date, service_slot, subtotal, service_charge, tax, discount,
-                        coupon_code, total_amount, notes, now, now
+                        coupon_code, total_amount, 'cod', 'pending', notes, now, now
                     ))
 
                     cursor.execute("""
