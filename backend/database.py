@@ -69,6 +69,9 @@ def init_db(db_path: str = DB_PATH):
         phone TEXT,
         password_hash TEXT NOT NULL,
         role TEXT NOT NULL DEFAULT 'customer',
+        google_id TEXT,
+        meta_id TEXT,
+        avatar_url TEXT,
         is_email_verified INTEGER DEFAULT 0,
         is_mobile_verified INTEGER DEFAULT 0,
         created_at TEXT NOT NULL
@@ -265,6 +268,15 @@ def init_db(db_path: str = DB_PATH):
             cursor.execute(statement)
         except Exception:
             pass
+    for statement in [
+        "ALTER TABLE users ADD COLUMN google_id TEXT",
+        "ALTER TABLE users ADD COLUMN meta_id TEXT",
+        "ALTER TABLE users ADD COLUMN avatar_url TEXT"
+    ]:
+        try:
+            cursor.execute(statement)
+        except Exception:
+            pass
     try:
         cursor.execute("ALTER TABLE users ADD COLUMN is_email_verified INTEGER DEFAULT 0")
     except Exception:
@@ -327,7 +339,9 @@ def seed_data(conn: sqlite3.Connection):
 
     now = datetime.now().isoformat()
 
-    admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
+    admin_password = os.environ.get('ADMIN_PASSWORD', '').strip()
+    if not admin_password:
+        raise RuntimeError('ADMIN_PASSWORD must be configured before database seeding. Refusing unsafe default credentials.')
     admin_pw = hash_password(admin_password)
     cursor.execute("""
         INSERT INTO users (name, email, phone, password_hash, role, is_email_verified, is_mobile_verified, created_at)
