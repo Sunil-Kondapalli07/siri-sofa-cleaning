@@ -863,19 +863,20 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                         import urllib.parse
                         import ssl
                         ctx = ssl.create_default_context()
-                        ctx.check_hostname = False
-                        ctx.verify_mode = ssl.CERT_NONE
                         verify_url = f"https://oauth2.googleapis.com/tokeninfo?id_token={urllib.parse.quote(credential)}"
                         req = urllib.request.Request(verify_url, headers={'User-Agent': 'SiriSofa-GoogleAuth/1.0'})
                         with urllib.request.urlopen(req, context=ctx, timeout=8) as resp:
                             if resp.status == 200:
                                 g_payload = json.loads(resp.read().decode('utf-8'))
                                 # Verify Google is the legitimate token issuer
-                                if g_payload.get('iss') in ['accounts.google.com', 'https://accounts.google.com']:
+                                expected_aud = os.environ.get('GOOGLE_CLIENT_ID', '').strip()
+                                if (g_payload.get('iss') in ['accounts.google.com', 'https://accounts.google.com'] and g_payload.get('email_verified') is True and (not expected_aud or g_payload.get('aud') == expected_aud)):
                                     email = g_payload.get('email', '').strip().lower()
                                     name = g_payload.get('name') or name or (email.split('@')[0] if email else 'Customer')
                                     avatar_url = g_payload.get('picture') or avatar_url
                                     google_id = g_payload.get('sub') or google_id
+                                else:
+                                    return self.send_json(401, {'error': 'Google token verification rejected'})
                             else:
                                 return self.send_json(401, {'error': 'Google verification rejected: Invalid ID token signature'})
                     except urllib.error.HTTPError as he:
