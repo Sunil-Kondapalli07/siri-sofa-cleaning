@@ -30,7 +30,7 @@ class AppStore {
         instructions: ''
       },
       serviceDate: this.getDefaultDate(),
-      serviceSlot: '10:30 AM',
+      serviceSlot: '09:00 AM',
       couponCode: '',
       discount: 0,
       notes: '',
