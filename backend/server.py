@@ -475,6 +475,52 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 }
                 return self.send_json(200, {'user': u_dict, 'token': token})
 
+            # POST /api/auth/meta
+            elif path == '/api/auth/meta':
+                access_token = payload.get('access_token', '').strip()
+                if not access_token:
+                    return self.send_json(400, {'error': 'Meta access token is required'})
+                app_id = os.environ.get('META_APP_ID', '').strip()
+                app_secret = os.environ.get('META_APP_SECRET', '').strip()
+                if not app_id or not app_secret:
+                    return self.send_json(503, {'error': 'Meta authentication is not configured on this server'})
+                try:
+                    app_token = f"{app_id}|{app_secret}"
+                    debug_url = "https://graph.facebook.com/debug_token?" + urllib.parse.urlencode({'input_token': access_token, 'access_token': app_token})
+                    with urllib.request.urlopen(debug_url, timeout=8) as resp:
+                        debug = json.loads(resp.read().decode()).get('data', {})
+                    if debug.get('is_valid') is not True or str(debug.get('app_id')) != app_id:
+                        return self.send_json(401, {'error': 'Meta token verification rejected'})
+                    user_url = "https://graph.facebook.com/me?" + urllib.parse.urlencode({'fields': 'id,name,email,picture.type(large)', 'access_token': access_token})
+                    with urllib.request.urlopen(user_url, timeout=8) as resp:
+                        profile = json.loads(resp.read().decode())
+                    email = (profile.get('email') or '').strip().lower()
+                    meta_id = str(profile.get('id') or '')
+                    name = (profile.get('name') or 'Customer').strip()
+                    avatar_url = (((profile.get('picture') or {}).get('data') or {}).get('url') or '').strip()
+                    if not meta_id or not email:
+                        return self.send_json(400, {'error': 'Meta account must provide an email address'})
+                except Exception:
+                    return self.send_json(401, {'error': 'Meta authentication failed'})
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM users WHERE LOWER(email)=?", (email,))
+                user = cursor.fetchone()
+                if not user:
+                    pw_hash = hash_password(secrets.token_urlsafe(32))
+                    cursor.execute("""INSERT INTO users
+                        (name,email,phone,password_hash,role,is_email_verified,is_mobile_verified,meta_id,avatar_url,created_at)
+                        VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                        (name,email,'',pw_hash,'customer',1,0,meta_id,avatar_url,now))
+                    conn.commit()
+                    user = cursor.execute("SELECT * FROM users WHERE id=?", (cursor.lastrowid,)).fetchone()
+                else:
+                    cursor.execute("UPDATE users SET meta_id=?, avatar_url=COALESCE(?,avatar_url), is_email_verified=1 WHERE id=?",
+                                   (meta_id, avatar_url or None, user['id']))
+                    conn.commit()
+                    user = cursor.execute("SELECT * FROM users WHERE id=?", (user['id'],)).fetchone()
+                token = create_user_session(conn, user['id'], user['role'], ip_addr, self.headers.get('User-Agent'))
+                return self.send_json(200, {'success': True, 'token': token, 'user': dict(user)})
+
             # POST /api/auth/logout
             elif path == '/api/auth/logout':
                 auth_header = self.headers.get('Authorization', '')
