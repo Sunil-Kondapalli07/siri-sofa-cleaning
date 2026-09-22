@@ -25,6 +25,24 @@ FRONTEND_DIR = os.path.join(BASE_DIR, 'frontend')
 # Ensure DB is initialized
 init_db(DB_PATH)
 
+
+
+def normalize_phone(value: str) -> str:
+    digits = ''.join(ch for ch in str(value or '') if ch.isdigit())
+    if digits.startswith('91') and len(digits) == 12:
+        digits = digits[2:]
+    if digits.startswith('0') and len(digits) == 11:
+        digits = digits[1:]
+    return digits
+
+def validate_service_slot(service_date: str, service_slot: str) -> bool:
+    try:
+        d = date.fromisoformat(service_date)
+    except Exception:
+        return False
+    allowed = {"09:00 AM", "11:00 AM", "01:00 PM", "03:00 PM", "05:00 PM"}
+    return d >= date.today() and service_slot in allowed
+
 def generate_booking_id(conn = None) -> str:
     """Generate cryptographically random booking ID with collision retry"""
     for _ in range(10):
@@ -1042,14 +1060,39 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 booking_id = parts[3]
                 new_date = payload.get('service_date')
                 new_slot = payload.get('service_slot')
-
+                caller = self.get_authenticated_user(conn)
+                if not caller:
+                    return self.send_json(401, {'error': 'Authentication required'})
+                if not validate_service_slot(new_date, new_slot):
+                    return self.send_json(400, {'error': 'Invalid or unavailable service date/time slot'})
                 cursor = conn.cursor()
-                cursor.execute("""
-                    UPDATE bookings 
-                    SET service_date = ?, service_slot = ?, updated_at = ?
-                    WHERE UPPER(id) = UPPER(?)
-                """, (new_date, new_slot, now, booking_id))
-                conn.commit()
+                cursor.execute("SELECT user_id, status FROM bookings WHERE UPPER(id)=UPPER(?)", (booking_id,))
+                booking = cursor.fetchone()
+                if not booking:
+                    return self.send_json(404, {'error': 'Booking not found'})
+                if caller.get('role') != 'admin' and str(booking['user_id']) != str(caller['id']):
+                    return self.send_json(403, {'error': 'Access denied'})
+                if booking['status'] in ('completed', 'cancelled'):
+                    return self.send_json(400, {'error': 'This booking cannot be rescheduled'})
+                cursor.execute("SELECT COUNT(*) FROM slot_reservations sr JOIN bookings b ON b.id=sr.booking_id WHERE sr.service_date=? AND sr.service_slot=? AND sr.booking_id<>? AND b.status!='cancelled'", (new_date,new_slot,booking_id))
+                if cursor.fetchone()[0] >= 3:
+                    return self.send_json(409, {'error': 'The selected slot is fully booked'})
+                conn.isolation_level = None
+                cursor.execute('BEGIN IMMEDIATE')
+                try:
+                    cursor.execute("DELETE FROM slot_reservations WHERE booking_id=?", (booking_id,))
+                    cursor.execute("SELECT slot_number FROM slot_reservations WHERE service_date=? AND service_slot=? ORDER BY slot_number", (new_date,new_slot))
+                    occupied={row[0] for row in cursor.fetchall()}
+                    slot_num=next((n for n in (1,2,3) if n not in occupied),None)
+                    if not slot_num:
+                        cursor.execute('ROLLBACK')
+                        return self.send_json(409, {'error':'The selected slot is fully booked'})
+                    cursor.execute("UPDATE bookings SET service_date=?, service_slot=?, updated_at=? WHERE UPPER(id)=UPPER(?)", (new_date,new_slot,now,booking_id))
+                    cursor.execute("INSERT INTO slot_reservations(service_date,service_slot,slot_number,booking_id,created_at) VALUES(?,?,?,?,?)", (new_date,new_slot,slot_num,booking_id,now))
+                    cursor.execute('COMMIT')
+                except Exception:
+                    cursor.execute('ROLLBACK')
+                    raise
                 return self.send_json(200, {'message': f'Booking {booking_id} rescheduled to {new_date} at {new_slot}'})
 
             # PUT /api/technicians/<id> (Admin only)
