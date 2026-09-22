@@ -68,7 +68,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   const [completedBookingId, setCompletedBookingId] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "razorpay">("cod");
 
-  const activeServices = (services && services.length > 0) ? services : DEFAULT_SERVICES;
+  useEffect(() => {\n    if (typeof window === "undefined" || document.getElementById("razorpay-checkout-script")) return;\n    const script = document.createElement("script");\n    script.id = "razorpay-checkout-script";\n    script.src = "https://checkout.razorpay.com/v1/checkout.js";\n    script.async = true;\n    document.head.appendChild(script);\n  }, []);\n\n  const activeServices = (services && services.length > 0) ? services : DEFAULT_SERVICES;
   const [activeCatalogCategory, setActiveCatalogCategory] = useState<string>("sofa");
   const [showCatalogPicker, setShowCatalogPicker] = useState<boolean>(true);
 
