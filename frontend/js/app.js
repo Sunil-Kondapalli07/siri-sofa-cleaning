@@ -1050,26 +1050,7 @@ const App = {
       const res = await ApiClient.sendOtp(target, channel, this.signupPending.user?.id);
       this.signupPending.challenges[channel] = res.challenge_id;
       this.startSignupCooldown(channel, 30);
-      if (res && res.dev_code) {
-        if (!this.signupPending.devCodes) this.signupPending.devCodes = {};
-        this.signupPending.devCodes[channel] = res.dev_code;
-        const noticeBox = document.getElementById('signup-notice-box');
-        if (noticeBox) {
-          const mCode = channel === 'mobile' ? res.dev_code : (this.signupPending.devCodes.mobile || null);
-          const eCode = channel === 'email' ? res.dev_code : (this.signupPending.devCodes.email || null);
-          noticeBox.className = 'mb-5 p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-left flex items-start gap-3';
-          noticeBox.innerHTML = `
-            <span class="text-xl">🔄</span>
-            <div class="text-xs text-amber-900 leading-tight flex-1">
-              <div class="font-bold text-slate-900">New Verification Code Generated</div>
-              <div class="mt-2 p-2 bg-white rounded-xl border border-amber-200 flex flex-wrap gap-4 font-mono text-xs shadow-sm">
-                ${mCode ? `<div>📱 Mobile SMS: <span class="bg-amber-100 text-slate-950 px-2 py-0.5 rounded font-black">${mCode}</span></div>` : ''}
-                ${eCode ? `<div>✉️ Email: <span class="bg-amber-100 text-slate-950 px-2 py-0.5 rounded font-black">${eCode}</span></div>` : ''}
-              </div>
-            </div>
-          `;
-        }
-      }
+
     } catch (err) {
       if (errBox) {
         errBox.innerText = err.message || 'Failed to resend code';
