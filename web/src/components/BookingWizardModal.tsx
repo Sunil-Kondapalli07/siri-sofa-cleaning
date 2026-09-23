@@ -72,6 +72,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   const [locationCaptured, setLocationCaptured] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "razorpay" | "upi_qr">("cod");
   const [upiQr, setUpiQr] = useState<{image_url:string; amount:number; qr_id:string} | null>(null);
+  const [upiQrBookingId, setUpiQrBookingId] = useState<string | null>(null);
   const [upiQrLoading, setUpiQrLoading] = useState(false);
 
   useEffect(() => {
@@ -82,6 +83,27 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     script.async = true;
     document.head.appendChild(script);
   }, []);
+
+  useEffect(() => {
+    if (!upiQr || !upiQrBookingId) return;
+    let stopped = false;
+    const checkPayment = async () => {
+      try {
+        const status = await api.getRazorpayPaymentStatus(upiQrBookingId);
+        if (!stopped && status?.payment_status === "paid") {
+          setCompletedBookingId(upiQrBookingId);
+        }
+      } catch {
+        // Keep polling; webhook/server status is the source of truth.
+      }
+    };
+    checkPayment();
+    const timer = window.setInterval(checkPayment, 3000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [upiQr, upiQrBookingId]);
 
   const ensureRazorpayLoaded = async () => {
     if (typeof window === "undefined") throw new Error("Online payment is only available in a browser.");
@@ -403,6 +425,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
           const qr = await api.createRazorpayQr(bookingId);
           if (!qr?.success || !qr?.image_url) throw new Error(qr?.error || "Could not create the UPI QR.");
           setUpiQr({ image_url: String(qr.image_url), amount: Number(qr.amount || Math.round(total * 100)), qr_id: String(qr.qr_id || "") });
+          setUpiQrBookingId(bookingId);
           setSubmitError("");
           return;
         } catch (error) {
