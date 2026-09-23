@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Service, ServiceVariant, CartItem, AvailableSlot, User } from "@/types";
 import { api } from "@/lib/api";
 import { DEFAULT_SERVICES } from "@/lib/defaultData";
+import { getSavedLocation, requestAndSaveCurrentLocation, SavedLocation } from "@/lib/location";
 import { X, Check, ArrowRight, ArrowLeft, Sparkles, AlertCircle, Lock, Plus, Minus } from "lucide-react";
 
 interface BookingWizardModalProps {
@@ -66,6 +67,9 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [completedBookingId, setCompletedBookingId] = useState<string | null>(null);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationMessage, setLocationMessage] = useState("");
+  const [locationCaptured, setLocationCaptured] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "razorpay">("cod");
 
   useEffect(() => {\n    if (typeof window === "undefined" || document.getElementById("razorpay-checkout-script")) return;\n    const script = document.createElement("script");\n    script.id = "razorpay-checkout-script";\n    script.src = "https://checkout.razorpay.com/v1/checkout.js";\n    script.async = true;\n    document.head.appendChild(script);\n  }, []);\n\n  const activeServices = (services && services.length > 0) ? services : DEFAULT_SERVICES;
@@ -82,6 +86,27 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     const item = cart.find((i) => i.variant.id === variantId);
     return item ? item.quantity : 0;
   };
+
+  // Restore the last saved service location and request a fresh browser location after sign-in.
+  useEffect(() => {
+    if (!user || typeof window === "undefined") return;
+    let cancelled = false;
+    const saved = getSavedLocation();
+    if (saved) {
+      queueMicrotask(() => {
+        if (cancelled) return;
+        setLocationCaptured(true);
+        if (saved.house_flat) setHouseFlat(saved.house_flat);
+        if (saved.street) setStreet(saved.street);
+        if (saved.area) setArea(saved.area);
+        if (saved.pincode) setPincode(saved.pincode);
+      });
+    }
+    queueMicrotask(() => {
+      if (!cancelled) setLocationMessage("Allow location access so we can pre-fill your service address. You can change it anytime.");
+    });
+    return () => { cancelled = true; };
+  }, [user]);
 
   // Synchronize customer contact if logged-in user changes
   useEffect(() => {
@@ -227,6 +252,25 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     return Object.keys(errs).length === 0;
   };
 
+  const handleUseCurrentLocation = async () => {
+    setLocationLoading(true);
+    setLocationMessage("Requesting your current location...");
+    try {
+      const saved: SavedLocation | null = await requestAndSaveCurrentLocation();
+      if (!saved) throw new Error("Location is not available in this browser.");
+      if (saved.house_flat) setHouseFlat(saved.house_flat);
+      if (saved.street) setStreet(saved.street);
+      if (saved.area) setArea(saved.area);
+      if (saved.pincode) setPincode(saved.pincode);
+      setLocationCaptured(true);
+      setLocationMessage("Location captured. Review the address below and change anything that is incorrect.");
+    } catch (error) {
+      setLocationMessage(error instanceof Error ? error.message : "Location permission was denied or unavailable. You can enter the address manually.");
+    } finally {
+      setLocationLoading(false);
+    }
+  };
+
   const handleStep3Continue = () => {
     if (!validateStep3()) return;
     setStep(4);
@@ -258,7 +302,18 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
         service_slot: serviceSlot,
         items: cart.map((it) => ({ variant_id: it.variant.id, quantity: it.quantity })),
         coupon_code: couponApplied ? couponCode.trim().toUpperCase() : undefined,
-        address: { house_flat: houseFlat.trim(), street: street.trim(), area, city: "Hyderabad", pincode: pincode.trim(), instructions },
+        address: (() => {
+          const saved = getSavedLocation();
+          return {
+            house_flat: houseFlat.trim(),
+            street: street.trim(),
+            area,
+            city: "Hyderabad",
+            pincode: pincode.trim(),
+            instructions,
+            ...(saved ? { latitude: saved.latitude, longitude: saved.longitude } : {}),
+          };
+        })(),
         notes: instructions,
         payment_method: paymentMethod,
       };
