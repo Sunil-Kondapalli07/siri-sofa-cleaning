@@ -1324,7 +1324,7 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 coupon_code = payload.get('coupon_code', '').strip().upper() or None
                 notes = payload.get('notes', '')
                 payment_method = str(payload.get('payment_method', 'cod')).lower().strip()
-                if payment_method not in ('cod', 'razorpay'):
+                if payment_method not in ('cod', 'razorpay', 'upi_qr'):
                     return self.send_json(400, {'error': 'Invalid payment method'})
                 payment_status = 'pending'
 
