@@ -16,6 +16,7 @@ import { AuthModal } from "@/components/AuthModal";
 import { AdminModal } from "@/components/AdminModal";
 import { DEFAULT_SERVICES } from "@/lib/defaultData";
 import { requestAndSaveCurrentLocation } from "@/lib/location";
+import { MyOrdersModal } from "@/components/MyOrdersModal";
 
 export default function Home() {
   const [services, setServices] = useState<Service[]>(DEFAULT_SERVICES);
@@ -44,7 +45,7 @@ export default function Home() {
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [isTrackerOpen, setIsTrackerOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);\n  const [isOrdersOpen, setIsOrdersOpen] = useState(false);
   const [trackingId, setTrackingId] = useState<string>("");
 
   useEffect(() => {
