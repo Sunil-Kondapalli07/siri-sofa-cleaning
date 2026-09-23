@@ -7,8 +7,10 @@ import socket
 import ssl
 import urllib.parse
 import urllib.request
+import subprocess
 import sqlite3
 import random
+import re
 import string
 import secrets
 import hmac
@@ -35,6 +37,74 @@ def normalize_phone(value: str) -> str:
         digits = digits[1:]
     return digits
 
+def _curl_config_value(value: str) -> str:
+    return str(value).replace("\\", "\\\\").replace('"', '\\"').replace("\r", "\\r").replace("\n", "\\n")
+
+def razorpay_request_json(
+    method: str,
+    url: str,
+    key_id: str,
+    key_secret: str,
+    payload: dict | None = None,
+    timeout_seconds: int = 20,
+) -> tuple[int, dict]:
+    """Call Razorpay using a system HTTPS client while retaining certificate verification.
+
+    The working Rice-business application uses Node's native fetch(). On this machine,
+    Python's OpenSSL trust store rejects a trusted/self-installed network certificate.
+    curl can use the operating system trust configuration while still verifying TLS.
+    Secrets are passed through curl's config on stdin, never as command-line arguments.
+    """
+    config_lines = [
+        'url = "' + _curl_config_value(url) + '"',
+        'request = "' + _curl_config_value(method.upper()) + '"',
+        'silent',
+        'show-error',
+        'location',
+        'proto = "https"',
+        f'max-time = {int(timeout_seconds)}',
+        'user-agent = "SiriSofaServices/1.0"',
+        'user = "' + _curl_config_value(f"{key_id}:{key_secret}") + '"',
+        'header = "Accept: application/json"',
+    ]
+    if payload is not None:
+        body = json.dumps(payload, separators=(",", ":"))
+        config_lines.extend([
+            'header = "Content-Type: application/json"',
+            'data = "' + _curl_config_value(body) + '"',
+        ])
+    config_lines.append('write-out = "\\n%{http_code}"')
+    config = "\n".join(config_lines) + "\n"
+
+    try:
+        proc = subprocess.run(
+            ["curl", "--config", "-"],
+            input=config.encode("utf-8"),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout_seconds + 5,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError("The backend requires curl for the Razorpay HTTPS connection. Install curl or use a standard system Python certificate store.") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise TimeoutError("Razorpay API request timed out from the backend.") from exc
+
+    raw = proc.stdout.decode("utf-8", errors="replace")
+    match = re.search(r"\n(\d{3})\s*$", raw)
+    if not match:
+        detail = proc.stderr.decode("utf-8", errors="replace").strip() or "no HTTP response"
+        raise RuntimeError(f"Razorpay API connection failed: {detail}")
+
+    status_code = int(match.group(1))
+    body = raw[:match.start()].strip()
+    try:
+        data = json.loads(body) if body else {}
+    except json.JSONDecodeError:
+        raise RuntimeError(f"Razorpay returned a non-JSON response (HTTP {status_code}).")
+
+    return status_code, data
+
 def create_razorpay_ssl_context() -> ssl.SSLContext:
     """Build a verified TLS context using an explicit CA bundle when configured."""
     configured_bundle = (
@@ -57,70 +127,38 @@ def create_razorpay_ssl_context() -> ssl.SSLContext:
         return ssl.create_default_context()
 
 def create_razorpay_order(key_id: str, key_secret: str, amount_paise: int, receipt: str) -> dict:
-    """Create a Razorpay order with the secret retained only on the server."""
-    import base64
-
+    """Create a Razorpay order with server-only credentials."""
     if not key_id or not key_secret:
         raise RuntimeError("RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are required")
     if not isinstance(amount_paise, int) or amount_paise < 100:
         raise ValueError("Payment amount must be at least ₹1")
 
-    auth = base64.b64encode(f"{key_id}:{key_secret}".encode("utf-8")).decode("ascii")
-    payload = json.dumps({
-        "amount": amount_paise,
-        "currency": "INR",
-        "receipt": receipt,
-        "payment_capture": 1
-    }).encode("utf-8")
-
-    req = urllib.request.Request(
+    status_code, data = razorpay_request_json(
+        "POST",
         "https://api.razorpay.com/v1/orders",
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "Authorization": f"Basic {auth}",
-            "User-Agent": "SiriSofaServices/1.0",
+        key_id,
+        key_secret,
+        {
+            "amount": amount_paise,
+            "currency": "INR",
+            "receipt": receipt,
+            "payment_capture": 1,
         },
-        method="POST",
     )
 
-    context = create_razorpay_ssl_context()
-    try:
-        with urllib.request.urlopen(req, timeout=20, context=context) as resp:
-            body = resp.read().decode("utf-8")
-            data = json.loads(body)
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
-        try:
-            data = json.loads(body)
-            provider_error = data.get("error") or {}
-            description = (
-                provider_error.get("description")
-                or provider_error.get("reason")
-                or "Razorpay rejected the order"
-            )
-        except Exception:
-            description = f"Razorpay returned HTTP {exc.code}"
-        raise RuntimeError(f"Razorpay order creation failed: {description}") from exc
-    except socket.gaierror as exc:
-        raise RuntimeError("DNS could not resolve api.razorpay.com from the backend.") from exc
-    except ssl.SSLCertVerificationError as exc:
-        raise RuntimeError(
-            "Razorpay TLS certificate verification failed. "
-            "Run your Python certificate setup (macOS: Install Certificates.command) "
-            "or configure RAZORPAY_CA_BUNDLE with the trusted CA bundle used by this network. "
-            "Do not disable SSL verification."
-        ) from exc
-    except ssl.SSLError as exc:
-        raise RuntimeError("TLS/SSL connection to Razorpay failed from the backend.") from exc
-    except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as exc:
-        detail = str(getattr(exc, "reason", exc)).strip() or "network error"
-        raise RuntimeError(f"Razorpay API is unreachable from the backend: {detail}") from exc
+    if status_code < 200 or status_code >= 300:
+        provider_error = data.get("error") or {}
+        description = (
+            provider_error.get("description")
+            or provider_error.get("reason")
+            or f"Razorpay returned HTTP {status_code}"
+        )
+        raise RuntimeError(f"Razorpay order creation failed: {description}")
 
     order_id = str(data.get("id") or "").strip()
     if not order_id.startswith("order_"):
         raise RuntimeError("Razorpay returned an invalid order response.")
+
     returned_amount = int(data.get("amount") or 0)
     if returned_amount != amount_paise:
         raise RuntimeError("Razorpay order amount did not match the server-calculated booking total.")
@@ -1434,16 +1472,36 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     return self.send_json(403, {'error':'Access denied'})
                 if order_id != (booking['payment_gateway_order_id'] or ''):
                     return self.send_json(400, {'error':'Payment order mismatch'})
+                key_id = os.environ.get('RAZORPAY_KEY_ID','').strip()
                 key_secret = os.environ.get('RAZORPAY_KEY_SECRET','').strip()
-                if not key_secret:
+                if not key_id or not key_secret:
                     return self.send_json(503, {'error':'Razorpay is not configured'})
                 expected = hmac.new(key_secret.encode(), f"{order_id}|{payment_id}".encode(), __import__('hashlib').sha256).hexdigest()
                 if not hmac.compare_digest(expected, signature):
                     return self.send_json(400, {'error':'Invalid payment signature'})
+
+                status_code, gateway_payment = razorpay_request_json(
+                    "GET",
+                    f"https://api.razorpay.com/v1/payments/{urllib.parse.quote(payment_id, safe='')}",
+                    key_id=caller.get('_razorpay_key_id') or os.environ.get('RAZORPAY_KEY_ID', '').strip(),
+                    key_secret=key_secret,
+                )
+                if status_code < 200 or status_code >= 300:
+                    return self.send_json(502, {'error':'Razorpay could not confirm the payment record.'})
+                if gateway_payment.get('order_id') != order_id:
+                    return self.send_json(400, {'error':'Razorpay payment order mismatch.'})
+                if gateway_payment.get('status') != 'captured':
+                    return self.send_json(400, {'error':'Payment has not been captured by Razorpay.'})
+                if int(gateway_payment.get('amount') or 0) != int(round(float(booking['total_amount']) * 100)):
+                    return self.send_json(400, {'error':'Payment amount does not match the booking total.'})
+                if gateway_payment.get('currency') != 'INR':
+                    return self.send_json(400, {'error':'Payment currency mismatch.'})
+
                 cursor.execute("UPDATE bookings SET payment_status='paid', payment_gateway_payment_id=?, updated_at=? WHERE id=?",(payment_id,now,booking_id))
-                cursor.execute("UPDATE payments SET payment_id=?,status='paid',updated_at=? WHERE booking_id=?",(payment_id,now,booking_id))
+                cursor.execute("UPDATE payments SET payment_id=?,method=?,status='paid',raw_response=?,updated_at=? WHERE booking_id=?",
+                               (payment_id, gateway_payment.get('method'), json.dumps(gateway_payment), now, booking_id))
                 conn.commit()
-                return self.send_json(200, {'success':True,'payment_status':'paid','booking_id':booking_id})
+                return self.send_json(200, {'success':True,'payment_status':'paid','booking_id':booking_id,'payment_method':gateway_payment.get('method')})
 
             # POST /api/payments/razorpay/webhook
             elif path == '/api/payments/razorpay/webhook':
