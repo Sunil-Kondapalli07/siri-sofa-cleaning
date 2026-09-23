@@ -91,7 +91,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               <div className="bg-[#EBF5F0] border border-[#C2E2D3] px-3 py-1.5 rounded-full flex items-center gap-2">
                 <UserIcon className="w-3.5 h-3.5 text-[#0C4A34]" />
                 <span className="text-xs font-bold text-[#0C4A34]">{user.name.split(" ")[0]}</span>
-                {user.role === "admin" && (
+                <button
+                onClick={onOpenOrders}
+                className="text-xs font-bold text-[#0C4A34] hover:underline px-2"
+              >
+                My Orders
+              </button>
+              {user.role === "admin" && (
                   <span className="bg-[#0C4A34] text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded">
                     Admin
                   </span>
@@ -191,12 +197,23 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <UserIcon className="w-4 h-4 text-[#0C4A34]" />
                   <span className="text-xs font-bold text-[#0C4A34]">{user.name}</span>
                 </div>
-                <button
-                  onClick={onLogout}
-                  className="text-xs font-bold text-red-600"
-                >
-                  Sign Out
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onOpenOrders();
+                    }}
+                    className="text-xs font-bold text-[#0C4A34]"
+                  >
+                    My Orders
+                  </button>
+                  <button
+                    onClick={onLogout}
+                    className="text-xs font-bold text-red-600"
+                  >
+                    Sign Out
+                  </button>
+                </div>
               </div>
             ) : (
               <button
