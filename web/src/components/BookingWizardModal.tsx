@@ -108,7 +108,6 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
       if (saved.house_flat) setHouseFlat(saved.house_flat);
       if (saved.street) setStreet(saved.street);
       if (saved.area) setArea(saved.area);
-      if (saved.city) setCity(saved.city);
       if (saved.pincode) setPincode(saved.pincode);
       setLocationMessage(
         saved.display_name
