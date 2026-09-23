@@ -619,7 +619,7 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     'is_email_verified': False,
                     'is_mobile_verified': False
                 }
-                return self.send_json(201, {
+                response_data = {
                     'success': True,
                     'user': u_dict,
                     'token': token,
@@ -629,7 +629,16 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     'mobile_challenge_id': m_challenge,
                     'email_challenge_id': e_challenge,
                     'message': 'Account created! Verification codes sent to your mobile and email.'
-                })
+                }
+
+                # Local/QA-only helper. Never expose OTPs unless TEST_MODE is
+                # explicitly enabled in the server environment.
+                if os.environ.get('SIRI_TEST_MODE', '').strip().lower() in ('1', 'true', 'yes'):
+                    response_data['test_mode'] = True
+                    response_data['test_mobile_otp'] = m_code if m_challenge else None
+                    response_data['test_email_otp'] = e_code
+
+                return self.send_json(201, response_data)
 
             # POST /api/auth/otp/send
             elif path == '/api/auth/otp/send':
