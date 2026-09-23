@@ -1757,13 +1757,14 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                         {
                             "amount": amount_paise,
                             "currency": "INR",
+                            "upi_link": True,
                             "accept_partial": False,
                             "reference_id": booking_id,
                             "description": f"Siri Sofa Services booking {booking_id}",
                             "customer": {
-                                "name": booking['name'],
-                                "email": booking['email'],
-                                "contact": booking['phone'],
+                                "name": booking['customer_name'],
+                                "email": booking['customer_email'],
+                                "contact": booking['customer_phone'],
                             },
                             "notify": {"sms": False, "email": False},
                             "reminder_enable": False,
@@ -1778,7 +1779,7 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                             try:
                                 image_url = razorpay_payment_link_qr_data_url(short_url)
                             except Exception as exc:
-                                return self.send_json(502, {'error': f'Could not generate the UPI QR: {exc}'})
+                                return self.send_json(502, {'error': f'Could not generate the UPI QR locally: {exc}'})
 
                             cursor.execute(
                                 "UPDATE bookings SET payment_method='upi_qr', payment_status='created', payment_gateway_link_id=?, updated_at=? WHERE id=?",
@@ -1797,8 +1798,18 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                                 'amount': amount_paise,
                                 'currency': 'INR',
                                 'booking_id': booking_id,
-                                'qr_source': 'razorpay_payment_link'
+                                'qr_source': 'razorpay_upi_payment_link'
                             })
+
+                    link_error = link_data.get('error') if isinstance(link_data, dict) else {}
+                    link_description = (
+                        link_error.get('description')
+                        or link_error.get('reason')
+                        or f'Razorpay Payment Link creation returned HTTP {link_status}'
+                    )
+                    return self.send_json(502, {
+                        'error': f'Razorpay Dynamic QR is unavailable for this account. Payment Link fallback also failed: {link_description}'
+                    })
 
                 provider_error = qr_data.get('error') or {}
                 description = provider_error.get('description') or provider_error.get('reason') or f'Razorpay returned HTTP {qr_status}'
