@@ -1658,37 +1658,28 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     return self.send_json(503, {'error': 'Razorpay is not configured on the server.'})
 
                 amount_paise = int(round(float(booking['total_amount']) * 100))
-                existing_qr = str(booking['payment_gateway_qr_id'] or '').strip()
-                try:
-                    if existing_qr:
-                        qr_status, qr_data = razorpay_request_json(
-                            "GET",
-                            f"https://api.razorpay.com/v1/payments/qr_codes/{urllib.parse.quote(existing_qr, safe='')}",
-                            key_id,
-                            key_secret,
-                        )
-                        if 200 <= qr_status < 300 and qr_data.get('id') == existing_qr and qr_data.get('status') == 'active':
-                            return self.send_json(200, {
-                                'success': True,
-                                'qr_id': existing_qr,
-                                'image_url': qr_data.get('image_url'),
-                                'amount': amount_paise,
-                                'currency': 'INR',
-                                'booking_id': booking_id
-                            })
+                existing_link = str(booking['payment_gateway_link_id'] or '').strip()
 
-                    existing_link = str(booking['payment_gateway_link_id'] or '').strip()
+                try:
+                    # QR checkout for Siri Sofa is backed by a Razorpay Payment Link.
+                    # This deliberately avoids the Razorpay Dynamic QR API because
+                    # that API returns HTTP 404 for the current merchant/test setup.
                     if existing_link:
-                        link_check_status, link_check = razorpay_request_json(
+                        link_status, link_data = razorpay_request_json(
                             "GET",
                             f"https://api.razorpay.com/v1/payment_links/{urllib.parse.quote(existing_link, safe='')}",
                             key_id,
                             key_secret,
                         )
-                        if 200 <= link_check_status < 300:
-                            existing_short_url = str(link_check.get('short_url') or '').strip()
-                            existing_link_state = str(link_check.get('status') or '').lower()
-                            if existing_short_url and existing_link_state in ('created', 'partially_paid'):
+                        if 200 <= link_status < 300:
+                            existing_short_url = str(link_data.get('short_url') or '').strip()
+                            existing_state = str(link_data.get('status') or '').lower()
+                            existing_amount = int(link_data.get('amount') or 0)
+                            if (
+                                existing_short_url
+                                and existing_state in ('created', 'partially_paid')
+                                and existing_amount == amount_paise
+                            ):
                                 image_url = razorpay_payment_link_qr_data_url(existing_short_url)
                                 return self.send_json(200, {
                                     'success': True,
@@ -1698,57 +1689,9 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                                     'amount': amount_paise,
                                     'currency': 'INR',
                                     'booking_id': booking_id,
-                                    'qr_source': 'razorpay_payment_link'
+                                    'qr_source': 'razorpay_upi_payment_link'
                                 })
 
-                    qr_status, qr_data = razorpay_request_json(
-                        "POST",
-                        "https://api.razorpay.com/v1/payments/qr_codes",
-                        key_id,
-                        key_secret,
-                        {
-                            "type": "upi_qr",
-                            "name": "Siri Sofa Services",
-                            "usage": "single_use",
-                            "fixed_amount": True,
-                            "payment_amount": amount_paise,
-                            "description": f"Siri Sofa booking {booking_id}",
-                            "close_by": int(time.time()) + 1800,
-                            "notes": {"booking_id": booking_id},
-                        },
-                    )
-                except (RuntimeError, TimeoutError) as exc:
-                    return self.send_json(502, {'error': str(exc)})
-
-                if 200 <= qr_status < 300:
-                    qr_id = str(qr_data.get('id') or '').strip()
-                    image_url = str(qr_data.get('image_url') or '').strip()
-                    if not qr_id or not image_url:
-                        return self.send_json(502, {'error': 'Razorpay returned an incomplete UPI QR response.'})
-
-                    cursor.execute(
-                        "UPDATE bookings SET payment_method='upi_qr', payment_status='created', payment_gateway_qr_id=?, updated_at=? WHERE id=?",
-                        (qr_id, now, booking_id)
-                    )
-                    cursor.execute(
-                        "UPDATE payments SET status='created', updated_at=? WHERE booking_id=?",
-                        (now, booking_id)
-                    )
-                    conn.commit()
-                    return self.send_json(200, {
-                        'success': True,
-                        'qr_id': qr_id,
-                        'image_url': image_url,
-                        'amount': amount_paise,
-                        'currency': 'INR',
-                        'booking_id': booking_id,
-                        'qr_source': 'razorpay_dynamic_qr'
-                    })
-
-                # Some Razorpay test/merchant accounts do not expose the Dynamic QR
-                # endpoint and return 404 even though normal Checkout works. Fall back
-                # to a Razorpay Payment Link, which remains fully trackable by Razorpay.
-                if qr_status == 404:
                     link_status, link_data = razorpay_request_json(
                         "POST",
                         "https://api.razorpay.com/v1/payment_links",
@@ -1762,58 +1705,71 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                             "reference_id": booking_id,
                             "description": f"Siri Sofa Services booking {booking_id}",
                             "customer": {
-                                "name": booking['customer_name'],
-                                "email": booking['customer_email'],
-                                "contact": booking['customer_phone'],
+                                "name": str(booking['customer_name'] or booking['name'] or 'Siri Sofa Customer'),
+                                "email": str(booking['customer_email'] or booking['email'] or ''),
+                                "contact": str(booking['customer_phone'] or booking['phone'] or ''),
                             },
                             "notify": {"sms": False, "email": False},
                             "reminder_enable": False,
                             "expire_by": int(time.time()) + 1800,
-                            "notes": {"booking_id": booking_id, "source": "siri-sofa-upi-qr"},
+                            "notes": {
+                                "booking_id": booking_id,
+                                "source": "siri-sofa-upi-qr",
+                            },
                         },
                     )
-                    if 200 <= link_status < 300:
-                        link_id = str(link_data.get('id') or '').strip()
-                        short_url = str(link_data.get('short_url') or '').strip()
-                        if link_id and short_url:
-                            try:
-                                image_url = razorpay_payment_link_qr_data_url(short_url)
-                            except Exception as exc:
-                                return self.send_json(502, {'error': f'Could not generate the UPI QR locally: {exc}'})
+                except (RuntimeError, TimeoutError) as exc:
+                    return self.send_json(502, {'error': str(exc)})
 
-                            cursor.execute(
-                                "UPDATE bookings SET payment_method='upi_qr', payment_status='created', payment_gateway_link_id=?, updated_at=? WHERE id=?",
-                                (link_id, now, booking_id)
-                            )
-                            cursor.execute(
-                                "UPDATE payments SET status='created', updated_at=? WHERE booking_id=?",
-                                (now, booking_id)
-                            )
-                            conn.commit()
-                            return self.send_json(200, {
-                                'success': True,
-                                'qr_id': link_id,
-                                'image_url': image_url,
-                                'payment_url': short_url,
-                                'amount': amount_paise,
-                                'currency': 'INR',
-                                'booking_id': booking_id,
-                                'qr_source': 'razorpay_upi_payment_link'
-                            })
+                if 200 <= link_status < 300:
+                    link_id = str(link_data.get('id') or '').strip()
+                    short_url = str(link_data.get('short_url') or '').strip()
+                    returned_amount = int(link_data.get('amount') or 0)
 
-                    link_error = link_data.get('error') if isinstance(link_data, dict) else {}
-                    link_description = (
-                        link_error.get('description')
-                        or link_error.get('reason')
-                        or f'Razorpay Payment Link creation returned HTTP {link_status}'
+                    if not link_id or not short_url:
+                        return self.send_json(502, {
+                            'error': 'Razorpay created the Payment Link but did not return its URL.'
+                        })
+                    if returned_amount != amount_paise:
+                        return self.send_json(502, {
+                            'error': 'Razorpay Payment Link amount did not match the booking amount.'
+                        })
+
+                    try:
+                        image_url = razorpay_payment_link_qr_data_url(short_url)
+                    except Exception as exc:
+                        return self.send_json(502, {'error': f'Could not generate the UPI QR locally: {exc}'})
+
+                    cursor.execute(
+                        "UPDATE bookings SET payment_method='upi_qr', payment_status='created', payment_gateway_link_id=?, updated_at=? WHERE id=?",
+                        (link_id, now, booking_id)
                     )
-                    return self.send_json(502, {
-                        'error': f'Razorpay Dynamic QR is unavailable for this account. Payment Link fallback also failed: {link_description}'
+                    cursor.execute(
+                        "UPDATE payments SET status='created', order_id=?, amount=?, currency='INR', raw_response=?, updated_at=? WHERE booking_id=?",
+                        (link_id, float(booking['total_amount']), 'INR', json.dumps(link_data), now, booking_id)
+                    )
+                    conn.commit()
+
+                    return self.send_json(200, {
+                        'success': True,
+                        'qr_id': link_id,
+                        'image_url': image_url,
+                        'payment_url': short_url,
+                        'amount': amount_paise,
+                        'currency': 'INR',
+                        'booking_id': booking_id,
+                        'qr_source': 'razorpay_upi_payment_link'
                     })
 
-                provider_error = qr_data.get('error') or {}
-                description = provider_error.get('description') or provider_error.get('reason') or f'Razorpay returned HTTP {qr_status}'
-                return self.send_json(502, {'error': f'Razorpay could not create a UPI QR: {description}'})
+                provider_error = link_data.get('error') if isinstance(link_data, dict) else {}
+                description = (
+                    provider_error.get('description')
+                    or provider_error.get('reason')
+                    or f'Razorpay Payment Link creation returned HTTP {link_status}'
+                )
+                return self.send_json(502, {
+                    'error': f'Razorpay UPI Payment Link could not be created: {description}'
+                })
 
             # POST /api/payments/razorpay/verify
             elif path == '/api/payments/razorpay/verify':
