@@ -312,6 +312,14 @@ export const api = {
     return data;
   },
 
+  async getRazorpayPaymentStatus(bookingId: string) {
+    const res = await fetchApi(`/api/payments/razorpay/status?booking_id=${encodeURIComponent(bookingId)}`, {
+      headers: getHeaders(),
+      cache: "no-store",
+    });
+    return await parseJsonResponse(res);
+  },
+
   async createRazorpayOrder(bookingId: string) {
     const res = await fetchApi("/api/payments/razorpay/order", {
       method: "POST", headers: getHeaders(), body: JSON.stringify({ booking_id: bookingId })
