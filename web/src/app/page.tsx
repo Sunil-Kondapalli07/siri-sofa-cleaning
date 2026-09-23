@@ -17,6 +17,7 @@ import { AdminModal } from "@/components/AdminModal";
 import { DEFAULT_SERVICES } from "@/lib/defaultData";
 
 import { MyOrdersModal } from "@/components/MyOrdersModal";
+import { getSavedLocation } from "@/lib/location";
 
 export default function Home() {
   const [services, setServices] = useState<Service[]>(DEFAULT_SERVICES);
@@ -34,6 +35,7 @@ export default function Home() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isOrdersOpen, setIsOrdersOpen] = useState(false);
   const [trackingId, setTrackingId] = useState<string>("");
+  const [locationLabel, setLocationLabel] = useState("");
 
   useEffect(() => {
     const savedUser = localStorage.getItem("siri_user_profile") || localStorage.getItem("siri_user");
@@ -54,6 +56,16 @@ export default function Home() {
   }, []);
 
 
+
+  useEffect(() => {
+    const syncLocation = () => {
+      const saved = getSavedLocation();
+      setLocationLabel(saved?.area || saved?.city || "");
+    };
+    syncLocation();
+    window.addEventListener("siri-location-updated", syncLocation);
+    return () => window.removeEventListener("siri-location-updated", syncLocation);
+  }, []);
 
   const handleUpdateQuantity = (variant: ServiceVariant, newQty: number) => {
     setCart((prev) => {
@@ -94,6 +106,7 @@ export default function Home() {
       {/* Navigation Bar */}
       <Navbar
         user={user}
+        locationLabel={locationLabel}
         onOpenBooking={() => setIsBookingOpen(true)}
         onOpenTracking={() => setIsTrackerOpen(true)}
         onOpenAuth={() => setIsAuthOpen(true)}
