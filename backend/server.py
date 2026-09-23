@@ -160,8 +160,8 @@ def razorpay_payment_link_qr_data_url(payment_url: str) -> str:
     No QR package or external QR service is used at runtime. The payload is only
     the Razorpay short URL, so scanning opens Razorpay's hosted payment page.
     """
-    if not payment_url or not payment_url.startswith(("https://", "http://")):
-        raise ValueError("Invalid Razorpay payment URL")
+    if not payment_url or not payment_url.startswith(("https://", "http://", "upi://")):
+        raise ValueError("Invalid Razorpay payment payload")
     qr = QrCode.encode_text(payment_url, QrCode.Ecc.MEDIUM)
     border = 4
     scale = 8
