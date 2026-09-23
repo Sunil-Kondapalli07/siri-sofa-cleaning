@@ -1423,6 +1423,14 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
 
             else:
                 return self.send_json(404, {'error': 'Endpoint not found'})
+        except Exception as handler_error:
+            # Never let an unexpected API exception become an HTML 500 response.
+            # Returning JSON makes the real server-side failure visible to the frontend.
+            error_type = type(handler_error).__name__
+            error_message = str(handler_error).strip() or "unexpected backend error"
+            return self.send_json(500, {
+                'error': f'Backend exception ({error_type}): {error_message}'
+            })
         finally:
             conn.close()
 
