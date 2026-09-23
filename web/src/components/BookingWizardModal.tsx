@@ -79,7 +79,9 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.async = true;
     document.head.appendChild(script);
-  }, []);\n\n  const activeServices = (services && services.length > 0) ? services : DEFAULT_SERVICES;
+  }, []);
+
+  const activeServices = (services && services.length > 0) ? services : DEFAULT_SERVICES;
   const [activeCatalogCategory, setActiveCatalogCategory] = useState<string>("sofa");
   const [showCatalogPicker, setShowCatalogPicker] = useState<boolean>(true);
 
