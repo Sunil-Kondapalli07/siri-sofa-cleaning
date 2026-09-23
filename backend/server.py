@@ -35,6 +35,70 @@ def normalize_phone(value: str) -> str:
         digits = digits[1:]
     return digits
 
+def create_razorpay_order(key_id: str, key_secret: str, amount_paise: int, receipt: str) -> dict:
+    """Create a Razorpay order with the secret retained only on the server."""
+    import base64
+
+    if not key_id or not key_secret:
+        raise RuntimeError("RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are required")
+    if not isinstance(amount_paise, int) or amount_paise < 100:
+        raise ValueError("Payment amount must be at least ₹1")
+
+    auth = base64.b64encode(f"{key_id}:{key_secret}".encode("utf-8")).decode("ascii")
+    payload = json.dumps({
+        "amount": amount_paise,
+        "currency": "INR",
+        "receipt": receipt,
+        "payment_capture": 1
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        "https://api.razorpay.com/v1/orders",
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": f"Basic {auth}",
+            "User-Agent": "SiriSofaServices/1.0",
+        },
+        method="POST",
+    )
+
+    context = ssl.create_default_context()
+    try:
+        with urllib.request.urlopen(req, timeout=20, context=context) as resp:
+            body = resp.read().decode("utf-8")
+            data = json.loads(body)
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        try:
+            data = json.loads(body)
+            provider_error = data.get("error") or {}
+            description = (
+                provider_error.get("description")
+                or provider_error.get("reason")
+                or "Razorpay rejected the order"
+            )
+        except Exception:
+            description = f"Razorpay returned HTTP {exc.code}"
+        raise RuntimeError(f"Razorpay order creation failed: {description}") from exc
+    except socket.gaierror as exc:
+        raise RuntimeError("DNS could not resolve api.razorpay.com from the backend.") from exc
+    except ssl.SSLError as exc:
+        raise RuntimeError("TLS/SSL connection to Razorpay failed from the backend.") from exc
+    except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as exc:
+        detail = str(getattr(exc, "reason", exc)).strip() or "network error"
+        raise RuntimeError(f"Razorpay API is unreachable from the backend: {detail}") from exc
+
+    order_id = str(data.get("id") or "").strip()
+    if not order_id.startswith("order_"):
+        raise RuntimeError("Razorpay returned an invalid order response.")
+    returned_amount = int(data.get("amount") or 0)
+    if returned_amount != amount_paise:
+        raise RuntimeError("Razorpay order amount did not match the server-calculated booking total.")
+
+    return data
+
 def validate_service_slot(service_date: str, service_slot: str) -> bool:
     try:
         d = date.fromisoformat(service_date)
@@ -1258,9 +1322,11 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 caller = self.get_authenticated_user(conn)
                 if not caller:
                     return self.send_json(401, {'error': 'Authentication required'})
+
                 booking_id = str(payload.get('booking_id', '')).strip()
                 if not booking_id:
                     return self.send_json(400, {'error': 'booking_id is required'})
+
                 cursor = conn.cursor()
                 cursor.execute("SELECT * FROM bookings WHERE id=?", (booking_id,))
                 booking = cursor.fetchone()
@@ -1268,59 +1334,57 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     return self.send_json(404, {'error': 'Booking not found'})
                 if caller['role'] != 'admin' and str(booking['user_id']) != str(caller['id']):
                     return self.send_json(403, {'error': 'Access denied'})
+                if str(booking['payment_status'] or '').lower() == 'paid':
+                    return self.send_json(409, {'error': 'This booking is already paid.'})
+
                 key_id = os.environ.get('RAZORPAY_KEY_ID', '').strip()
                 key_secret = os.environ.get('RAZORPAY_KEY_SECRET', '').strip()
                 if not key_id or not key_secret:
-                    return self.send_json(503, {'error': 'Razorpay is not configured. COD remains available.'})
+                    return self.send_json(503, {
+                        'error': 'Online payment is not configured on the server. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET; Cash on Delivery remains available.'
+                    })
+
                 amount_paise = int(round(float(booking['total_amount']) * 100))
-                import base64
-                auth = base64.b64encode(f"{key_id}:{key_secret}".encode()).decode()
-                req = urllib.request.Request(
-                    "https://api.razorpay.com/v1/orders",
-                    data=json.dumps({'amount': amount_paise, 'currency': 'INR', 'receipt': booking_id}).encode(),
-                    headers={'Content-Type':'application/json','Authorization':f'Basic {auth}'}, method='POST')
                 try:
-                    with urllib.request.urlopen(req, timeout=10) as resp:
-                        order = json.loads(resp.read().decode())
-                except urllib.error.HTTPError as e:
-                    try:
-                        provider_body = e.read().decode("utf-8", errors="replace")
-                        provider_json = json.loads(provider_body)
-                        provider_error = ((provider_json.get("error") or {}).get("description") or
-                                          (provider_json.get("error") or {}).get("reason") or
-                                          "Razorpay rejected the order")
-                    except Exception:
-                        provider_error = "Razorpay rejected the order"
-                    return self.send_json(502, {'error': f'Razorpay order creation failed: {provider_error}'})
-                except urllib.error.URLError as e:
-                    reason = getattr(e, 'reason', None)
-                    if isinstance(reason, socket.gaierror):
-                        detail = "DNS could not resolve api.razorpay.com."
-                    elif isinstance(reason, ssl.SSLError):
-                        detail = "TLS/SSL connection to Razorpay failed."
-                    elif reason:
-                        detail = str(reason).strip()
-                    else:
-                        detail = str(e).strip() or "network error"
-                    return self.send_json(502, {
-                        'error': f'Razorpay API is unreachable from the backend: {detail}'
-                    })
-                except TimeoutError:
-                    return self.send_json(504, {
-                        'error': 'Razorpay API request timed out from the backend.'
-                    })
-                except Exception as e:
-                    return self.send_json(502, {
-                        'error': f'Unable to create Razorpay order: {str(e).strip() or "unexpected backend error"}'
-                    })
-                cursor.execute("UPDATE bookings SET payment_method='razorpay', payment_gateway_order_id=?, payment_status='created', updated_at=? WHERE id=?",
-                               (order.get('id'), now, booking_id))
-                cursor.execute("""INSERT INTO payments(booking_id,provider,order_id,amount,currency,status,created_at,updated_at)
-                                  VALUES(?,?,?,?,?,?,?,?)
-                                  ON CONFLICT(booking_id) DO UPDATE SET order_id=excluded.order_id,status='created',updated_at=excluded.updated_at""",
-                               (booking_id,'razorpay',order.get('id'),float(booking['total_amount']),'INR','created',now,now))
+                    order = create_razorpay_order(key_id, key_secret, amount_paise, booking_id)
+                except ValueError as exc:
+                    return self.send_json(400, {'error': str(exc)})
+                except RuntimeError as exc:
+                    message = str(exc)
+                    status = 502
+                    if message.startswith("Online payment is not configured"):
+                        status = 503
+                    elif "DNS could not resolve" in message:
+                        status = 502
+                    elif "timed out" in message.lower():
+                        status = 504
+                    return self.send_json(status, {'error': message})
+
+                order_id = str(order.get('id')).strip()
+                cursor.execute(
+                    "UPDATE bookings SET payment_method='razorpay', payment_gateway_order_id=?, payment_status='created', updated_at=? WHERE id=?",
+                    (order_id, now, booking_id)
+                )
+                cursor.execute(
+                    """INSERT INTO payments(booking_id,provider,order_id,amount,currency,status,created_at,updated_at)
+                       VALUES(?,?,?,?,?,?,?,?)
+                       ON CONFLICT(booking_id) DO UPDATE SET
+                         order_id=excluded.order_id,
+                         amount=excluded.amount,
+                         currency=excluded.currency,
+                         status='created',
+                         updated_at=excluded.updated_at""",
+                    (booking_id, 'razorpay', order_id, float(booking['total_amount']), 'INR', 'created', now, now)
+                )
                 conn.commit()
-                return self.send_json(200, {'success':True,'key_id':key_id,'order_id':order.get('id'),'amount':amount_paise,'currency':'INR','booking_id':booking_id})
+                return self.send_json(200, {
+                    'success': True,
+                    'key_id': key_id,
+                    'order_id': order_id,
+                    'amount': amount_paise,
+                    'currency': 'INR',
+                    'booking_id': booking_id
+                })
 
             # POST /api/payments/razorpay/verify
             elif path == '/api/payments/razorpay/verify':
