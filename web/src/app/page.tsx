@@ -15,7 +15,7 @@ import { BookingTrackerModal } from "@/components/BookingTrackerModal";
 import { AuthModal } from "@/components/AuthModal";
 import { AdminModal } from "@/components/AdminModal";
 import { DEFAULT_SERVICES } from "@/lib/defaultData";
-import { getSavedLocation, requestAndSaveCurrentLocation } from "@/lib/location";
+
 import { MyOrdersModal } from "@/components/MyOrdersModal";
 
 export default function Home() {
@@ -33,9 +33,6 @@ export default function Home() {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isOrdersOpen, setIsOrdersOpen] = useState(false);
-  const [locationPromptOpen, setLocationPromptOpen] = useState(false);
-  const [locationPromptMessage, setLocationPromptMessage] = useState("");
-  const [savedLocationLabel, setSavedLocationLabel] = useState("");
   const [trackingId, setTrackingId] = useState<string>("");
 
   useEffect(() => {
@@ -56,30 +53,7 @@ export default function Home() {
     });
   }, []);
 
-  useEffect(() => {
-    if (!user) {
-      setLocationPromptOpen(false);
-      setSavedLocationLabel("");
-      return;
-    }
 
-    const syncLocation = () => {
-      const saved = getSavedLocation();
-      if (!saved) {
-        setSavedLocationLabel("");
-        setLocationPromptMessage("Allow location so we can pre-fill your service address.");
-        setLocationPromptOpen(true);
-        return;
-      }
-      setSavedLocationLabel(saved.area || saved.city || saved.display_name || "Current location saved");
-      setLocationPromptMessage("Your location is saved. You can update it anytime.");
-      setLocationPromptOpen(false);
-    };
-
-    syncLocation();
-    window.addEventListener("siri-location-updated", syncLocation);
-    return () => window.removeEventListener("siri-location-updated", syncLocation);
-  }, [user]);
 
   const handleUpdateQuantity = (variant: ServiceVariant, newQty: number) => {
     setCart((prev) => {
@@ -100,10 +74,6 @@ export default function Home() {
     setUser(loggedInUser);
     localStorage.setItem("siri_user_profile", JSON.stringify(loggedInUser));
     localStorage.setItem("siri_user", JSON.stringify(loggedInUser));
-    if (!getSavedLocation()) {
-      setLocationPromptOpen(true);
-      setLocationPromptMessage("Allow location so we can pre-fill your service address.");
-    }
   };
 
   const handleLogout = () => {
@@ -131,43 +101,6 @@ export default function Home() {
         onOpenOrders={() => setIsOrdersOpen(true)}
         onLogout={handleLogout}
       />
-
-      {user && locationPromptOpen && (
-        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[55] w-[min(92vw,560px)] rounded-2xl border border-[#C2E2D3] bg-white shadow-2xl p-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#EBF5F0] flex items-center justify-center text-lg shrink-0">📍</div>
-            <div className="flex-1">
-              <div className="font-black text-sm text-[#121820]">Allow location for faster booking</div>
-              <p className="text-[11px] text-[#525D6C] mt-1">We’ll use your current location to pre-fill your service address. You can change it before booking.</p>
-              {locationPromptMessage && <p className="text-[11px] font-semibold text-[#0C4A34] mt-2">{locationPromptMessage}</p>}
-              <div className="flex gap-2 mt-3">
-                <button type="button" onClick={() => {
-                  setLocationPromptMessage("Requesting your current location...");
-                  void requestAndSaveCurrentLocation()
-                    .then((saved) => {
-                      if (saved) {
-                        setLocationPromptMessage("Location captured. Your address will be filled automatically.");
-                        setLocationPromptOpen(false);
-                      }
-                    })
-                    .catch((error) => {
-                      setLocationPromptMessage(
-                        error instanceof Error ? error.message : "Unable to detect location. You can enter your address manually."
-                      );
-                    });
-                }} className="btn-primary text-[11px] py-2.5 px-4">Allow Location</button>
-                <button type="button" onClick={() => setLocationPromptOpen(false)} className="text-[11px] font-bold text-[#8490A0] px-3">Enter manually</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {user && savedLocationLabel && (
-        <div className="fixed top-[76px] right-5 z-[45] rounded-full border border-[#C2E2D3] bg-white/95 px-4 py-2 shadow-lg backdrop-blur">
-          <span className="text-[11px] font-bold text-[#0C4A34]">📍 {savedLocationLabel}</span>
-        </div>
-      )}
 
       {/* Main Experience Flow */}
       <main className="flex-1">
