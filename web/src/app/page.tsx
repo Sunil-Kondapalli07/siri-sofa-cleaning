@@ -60,13 +60,14 @@ export default function Home() {
       setLocationPromptOpen(false);
       return;
     }
-    if (getSavedLocation()) {
-      setLocationPromptOpen(false);
-      return;
-    }
-    // Do not call geolocation automatically here. Browsers can suppress or race
-    // permission prompts unless the request is made from a user gesture.
-    setLocationPromptMessage("Allow location so we can pre-fill your service address.");
+    // Always show the in-app location control after sign-in. A previously saved
+    // coordinate must not hide the control because the customer may want to
+    // update/change their service location.
+    setLocationPromptMessage(
+      getSavedLocation()
+        ? "Your last service location is saved. Update it anytime."
+        : "Allow location so we can pre-fill your service address."
+    );
     setLocationPromptOpen(true);
   }, [user]);
 
