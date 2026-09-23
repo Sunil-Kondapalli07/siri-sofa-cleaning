@@ -5,13 +5,9 @@ const getApiBase = (): string => {
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "");
   }
-  if (typeof window !== "undefined") {
-    // Frontend is on port 3000, Backend API runs on port 8000
-    const hostname = window.location.hostname || "localhost";
-    return `${window.location.protocol}//${hostname}:8000`;
-  }
-  // SSR fallback
-  return "http://127.0.0.1:8000";
+  // Use the configured public backend when available. Otherwise use the same-origin
+  // /api path so Next.js can proxy it in both development and production.
+  return "";
 };
 
 async function fetchApi(endpoint: string, options: RequestInit = {}): Promise<Response> {
