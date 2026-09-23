@@ -1207,8 +1207,20 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 try:
                     with urllib.request.urlopen(req, timeout=10) as resp:
                         order = json.loads(resp.read().decode())
-                except Exception as e:
-                    return self.send_json(502, {'error': 'Unable to create Razorpay order'})
+                except urllib.error.HTTPError as e:
+                    try:
+                        provider_body = e.read().decode("utf-8", errors="replace")
+                        provider_json = json.loads(provider_body)
+                        provider_error = ((provider_json.get("error") or {}).get("description") or
+                                          (provider_json.get("error") or {}).get("reason") or
+                                          "Razorpay rejected the order")
+                    except Exception:
+                        provider_error = "Razorpay rejected the order"
+                    return self.send_json(502, {'error': f'Razorpay order creation failed: {provider_error}'})
+                except (urllib.error.URLError, TimeoutError) as e:
+                    return self.send_json(502, {'error': 'Could not reach Razorpay from the backend. Check server internet access and Razorpay configuration.'})
+                except Exception:
+                    return self.send_json(502, {'error': 'Unable to create Razorpay order due to a backend error'})
                 cursor.execute("UPDATE bookings SET payment_method='razorpay', payment_gateway_order_id=?, payment_status='created', updated_at=? WHERE id=?",
                                (order.get('id'), now, booking_id))
                 cursor.execute("""INSERT INTO payments(booking_id,provider,order_id,amount,currency,status,created_at,updated_at)
