@@ -1289,10 +1289,27 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     except Exception:
                         provider_error = "Razorpay rejected the order"
                     return self.send_json(502, {'error': f'Razorpay order creation failed: {provider_error}'})
-                except (urllib.error.URLError, TimeoutError) as e:
-                    return self.send_json(502, {'error': 'Could not reach Razorpay from the backend. Check server internet access and Razorpay configuration.'})
-                except Exception:
-                    return self.send_json(502, {'error': 'Unable to create Razorpay order due to a backend error'})
+                except urllib.error.URLError as e:
+                    reason = getattr(e, 'reason', None)
+                    if isinstance(reason, socket.gaierror):
+                        detail = "DNS could not resolve api.razorpay.com."
+                    elif isinstance(reason, ssl.SSLError):
+                        detail = "TLS/SSL connection to Razorpay failed."
+                    elif reason:
+                        detail = str(reason).strip()
+                    else:
+                        detail = str(e).strip() or "network error"
+                    return self.send_json(502, {
+                        'error': f'Razorpay API is unreachable from the backend: {detail}'
+                    })
+                except TimeoutError:
+                    return self.send_json(504, {
+                        'error': 'Razorpay API request timed out from the backend.'
+                    })
+                except Exception as e:
+                    return self.send_json(502, {
+                        'error': f'Unable to create Razorpay order: {str(e).strip() or "unexpected backend error"}'
+                    })
                 cursor.execute("UPDATE bookings SET payment_method='razorpay', payment_gateway_order_id=?, payment_status='created', updated_at=? WHERE id=?",
                                (order.get('id'), now, booking_id))
                 cursor.execute("""INSERT INTO payments(booking_id,provider,order_id,amount,currency,status,created_at,updated_at)
