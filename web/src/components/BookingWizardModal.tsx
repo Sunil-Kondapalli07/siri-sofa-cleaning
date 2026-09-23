@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Service, ServiceVariant, CartItem, AvailableSlot, User } from "@/types";
 import { api } from "@/lib/api";
 import { DEFAULT_SERVICES } from "@/lib/defaultData";
-import { getSavedLocation, requestAndSaveCurrentLocation, SavedLocation } from "@/lib/location";
+import { getSavedLocation, requestAndSaveCurrentLocation, enrichSavedLocation, SavedLocation } from "@/lib/location";
 import { X, Check, ArrowRight, ArrowLeft, Sparkles, AlertCircle, Lock, Plus, Minus } from "lucide-react";
 
 interface BookingWizardModalProps {
@@ -100,25 +100,36 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   // synchronized if another part of the app captures/updates location.
   useEffect(() => {
     if (typeof window === "undefined") return;
+    let cancelled = false;
 
-    const applySavedLocation = () => {
-      const saved = getSavedLocation();
-      if (!saved) return;
+    const applyLocation = (saved: SavedLocation | null) => {
+      if (!saved || cancelled) return;
       setLocationCaptured(true);
       if (saved.house_flat) setHouseFlat(saved.house_flat);
       if (saved.street) setStreet(saved.street);
       if (saved.area) setArea(saved.area);
       if (saved.pincode) setPincode(saved.pincode);
       setLocationMessage(
-        saved.display_name
-          ? `Location saved: ${saved.area || saved.city || saved.display_name}`
-          : "Location saved. Please confirm or edit your service address."
+        saved.display_name || saved.street || saved.area
+          ? "Current location applied. Please confirm or edit your address."
+          : "GPS location saved. Enter your House / Flat and Landmark."
       );
+    };
+
+    const applySavedLocation = () => {
+      const saved = getSavedLocation();
+      applyLocation(saved);
+      if (saved && !saved.display_name && !saved.street && !saved.pincode) {
+        void enrichSavedLocation(saved).then((enriched) => applyLocation(enriched));
+      }
     };
 
     applySavedLocation();
     window.addEventListener("siri-location-updated", applySavedLocation);
-    return () => window.removeEventListener("siri-location-updated", applySavedLocation);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("siri-location-updated", applySavedLocation);
+    };
   }, [isOpen, user]);
 
   // Synchronize customer contact if logged-in user changes
@@ -857,22 +868,26 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                       <label className="block text-xs font-bold text-[#121820] mb-1.5">
                         Hyderabad Locality / Area *
                       </label>
-                      <select
+                      <input
+                        type="text"
+                        list="hyderabad-localities"
                         value={area}
                         onChange={(e) => setArea(e.target.value)}
+                        placeholder="e.g. Gachibowli"
                         className="w-full px-4 py-3 rounded-xl border border-black/15 text-sm focus:outline-none focus:border-[#0C4A34] bg-white"
-                      >
-                        <option value="Banjara Hills">Banjara Hills</option>
-                        <option value="Jubilee Hills">Jubilee Hills</option>
-                        <option value="Gachibowli">Gachibowli</option>
-                        <option value="Hitec City">Hitec City</option>
-                        <option value="Madhapur">Madhapur</option>
-                        <option value="Kondapur">Kondapur</option>
-                        <option value="Kukatpally">Kukatpally</option>
-                        <option value="Begumpet">Begumpet</option>
-                        <option value="Secunderabad">Secunderabad</option>
-                        <option value="Somajiguda">Somajiguda</option>
-                      </select>
+                      />
+                      <datalist id="hyderabad-localities">
+                        <option value="Banjara Hills" />
+                        <option value="Jubilee Hills" />
+                        <option value="Gachibowli" />
+                        <option value="Hitec City" />
+                        <option value="Madhapur" />
+                        <option value="Kondapur" />
+                        <option value="Kukatpally" />
+                        <option value="Begumpet" />
+                        <option value="Secunderabad" />
+                        <option value="Somajiguda" />
+                      </datalist>
                     </div>
 
                     <div>
