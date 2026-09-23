@@ -413,6 +413,9 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
           throw new Error("Razorpay returned an invalid order ID. Please check the backend Razorpay configuration.");
         }
 
+        let resolvePayment: (() => void) | null = null;
+        let rejectPayment: ((error: unknown) => void) | null = null;
+
         const checkout = new RazorpayCtor({
           key: razorpayKey,
           amount: Number(order.amount),
@@ -447,8 +450,6 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
           },
         });
 
-        let resolvePayment: (() => void) | null = null;
-        let rejectPayment: ((error: unknown) => void) | null = null;
         await new Promise<void>((resolve, reject) => {
           resolvePayment = resolve;
           rejectPayment = reject;
