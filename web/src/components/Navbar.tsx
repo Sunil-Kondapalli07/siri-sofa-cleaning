@@ -12,6 +12,7 @@ interface NavbarProps {
   onOpenAdmin: () => void;
   onOpenOrders: () => void;
   onLogout: () => void;
+  locationLabel?: string;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -22,6 +23,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAdmin,
   onOpenOrders,
   onLogout,
+  locationLabel,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -61,6 +63,13 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
         </a>
+
+        {locationLabel && (
+          <div className="hidden md:flex items-center gap-1.5 rounded-full border border-[#C2E2D3] bg-[#EBF5F0] px-3 py-2 text-[11px] font-bold text-[#0C4A34]" title="Saved service location">
+            <span>📍</span>
+            <span>{locationLabel}</span>
+          </div>
+        )}
 
         {/* Desktop Navigation Links */}
         <div className="hidden lg:flex items-center gap-8 text-xs font-bold text-[#525D6C] tracking-wide">
