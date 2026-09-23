@@ -35,6 +35,27 @@ def normalize_phone(value: str) -> str:
         digits = digits[1:]
     return digits
 
+def create_razorpay_ssl_context() -> ssl.SSLContext:
+    """Build a verified TLS context using an explicit CA bundle when configured."""
+    configured_bundle = (
+        os.environ.get("RAZORPAY_CA_BUNDLE", "").strip()
+        or os.environ.get("SSL_CERT_FILE", "").strip()
+    )
+    if configured_bundle:
+        if not os.path.isfile(configured_bundle):
+            raise RuntimeError(
+                f"Configured Razorpay CA bundle was not found: {configured_bundle}"
+            )
+        return ssl.create_default_context(cafile=configured_bundle)
+
+    # Python's official macOS installer provides certifi through its
+    # Install Certificates.command workflow. Prefer it when installed.
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
 def create_razorpay_order(key_id: str, key_secret: str, amount_paise: int, receipt: str) -> dict:
     """Create a Razorpay order with the secret retained only on the server."""
     import base64
@@ -64,7 +85,7 @@ def create_razorpay_order(key_id: str, key_secret: str, amount_paise: int, recei
         method="POST",
     )
 
-    context = ssl.create_default_context()
+    context = create_razorpay_ssl_context()
     try:
         with urllib.request.urlopen(req, timeout=20, context=context) as resp:
             body = resp.read().decode("utf-8")
@@ -84,6 +105,13 @@ def create_razorpay_order(key_id: str, key_secret: str, amount_paise: int, recei
         raise RuntimeError(f"Razorpay order creation failed: {description}") from exc
     except socket.gaierror as exc:
         raise RuntimeError("DNS could not resolve api.razorpay.com from the backend.") from exc
+    except ssl.SSLCertVerificationError as exc:
+        raise RuntimeError(
+            "Razorpay TLS certificate verification failed. "
+            "Run your Python certificate setup (macOS: Install Certificates.command) "
+            "or configure RAZORPAY_CA_BUNDLE with the trusted CA bundle used by this network. "
+            "Do not disable SSL verification."
+        ) from exc
     except ssl.SSLError as exc:
         raise RuntimeError("TLS/SSL connection to Razorpay failed from the backend.") from exc
     except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as exc:
