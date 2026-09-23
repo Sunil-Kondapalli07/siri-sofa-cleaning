@@ -81,6 +81,38 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     document.head.appendChild(script);
   }, []);
 
+  const ensureRazorpayLoaded = async () => {
+    if (typeof window === "undefined") throw new Error("Online payment is only available in a browser.");
+    if ((window as any).Razorpay) return;
+
+    await new Promise<void>((resolve, reject) => {
+      const existing = document.getElementById("razorpay-checkout-script") as HTMLScriptElement | null;
+      if (!existing) {
+        reject(new Error("Razorpay checkout script could not be loaded. Please refresh and try again."));
+        return;
+      }
+      const onLoad = () => {
+        cleanup();
+        resolve();
+      };
+      const onError = () => {
+        cleanup();
+        reject(new Error("Razorpay checkout could not be loaded. Check your internet connection or content blockers."));
+      };
+      const cleanup = () => {
+        existing.removeEventListener("load", onLoad);
+        existing.removeEventListener("error", onError);
+      };
+      existing.addEventListener("load", onLoad, { once: true });
+      existing.addEventListener("error", onError, { once: true });
+      setTimeout(() => {
+        cleanup();
+        if ((window as any).Razorpay) resolve();
+        else reject(new Error("Razorpay checkout took too long to load. Please try again."));
+      }, 10000);
+    });
+  };
+
   const activeServices = (services && services.length > 0) ? services : DEFAULT_SERVICES;
   const [activeCatalogCategory, setActiveCatalogCategory] = useState<string>("sofa");
   const [showCatalogPicker, setShowCatalogPicker] = useState<boolean>(true);
@@ -369,38 +401,62 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
           throw new Error(order?.error || "Unable to start Razorpay payment. Please try Cash on Delivery.");
         }
 
+        await ensureRazorpayLoaded();
         const RazorpayCtor = (window as any).Razorpay;
-        if (!RazorpayCtor) {
-          throw new Error("Razorpay checkout is not loaded. Please refresh the page or use Cash on Delivery.");
+        const razorpayKey = String(order.key_id || "").trim();
+        const razorpayOrderId = String(order.order_id || "").trim();
+
+        if (!/^rzp_(test|live)_[A-Za-z0-9]+$/.test(razorpayKey)) {
+          throw new Error("Razorpay public Key ID is missing or invalid. Configure RAZORPAY_KEY_ID on the backend.");
+        }
+        if (!/^order_[A-Za-z0-9]+$/.test(razorpayOrderId)) {
+          throw new Error("Razorpay returned an invalid order ID. Please check the backend Razorpay configuration.");
         }
 
+        const checkout = new RazorpayCtor({
+          key: razorpayKey,
+          amount: Number(order.amount),
+          currency: String(order.currency || "INR"),
+          name: "Siri Sofa Services",
+          description: "Sofa & upholstery cleaning",
+          order_id: razorpayOrderId,
+          prefill: {
+            name: name.trim(),
+            email: email.trim(),
+            contact: phone.replace(/\+91|\s|-/g, ""),
+          },
+          theme: { color: "#0C4A34" },
+          handler: async (response: any) => {
+            try {
+              const verified = await api.verifyRazorpayPayment({
+                booking_id: bookingId,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              });
+              if (!verified?.success) throw new Error(verified?.error || "Payment verification failed.");
+              resolvePayment?.();
+            } catch (e) {
+              rejectPayment?.(e);
+            }
+          },
+          modal: {
+            ondismiss: () => rejectPayment?.(
+              new Error("Payment cancelled. Your booking remains pending payment.")
+            ),
+          },
+        });
+
+        let resolvePayment: (() => void) | null = null;
+        let rejectPayment: ((error: unknown) => void) | null = null;
         await new Promise<void>((resolve, reject) => {
-          const checkout = new RazorpayCtor({
-            key: order.key_id,
-            amount: order.amount,
-            currency: order.currency || "INR",
-            name: "Siri Sofa Services",
-            description: "Sofa & upholstery cleaning",
-            order_id: order.order_id,
-            prefill: { name: name.trim(), email: email.trim(), contact: phone.replace(/\+91|\s|-/g, "") },
-            theme: { color: "#0C4A34" },
-            handler: async (response: any) => {
-              try {
-                const verified = await api.verifyRazorpayPayment({
-                  booking_id: bookingId,
-                  razorpay_order_id: response.razorpay_order_id,
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_signature: response.razorpay_signature,
-                });
-                if (!verified?.success) throw new Error(verified?.error || "Payment verification failed.");
-                resolve();
-              } catch (e) {
-                reject(e);
-              }
-            },
-            modal: { ondismiss: () => reject(new Error("Payment cancelled. Your booking remains pending payment.")) },
-          });
-          checkout.open();
+          resolvePayment = resolve;
+          rejectPayment = reject;
+          try {
+            checkout.open();
+          } catch (error) {
+            reject(error instanceof Error ? error : new Error("Unable to open Razorpay checkout."));
+          }
         });
       }
 
@@ -1104,7 +1160,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                     )}
                     {paymentMethod === "razorpay" && (
                       <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-[11px] font-semibold text-blue-900">
-                        Online payment will open securely after your booking is created. If Razorpay is not configured, you can switch back to Cash on Delivery.
+                        Online payment will open in the secure Razorpay checkout after your booking is created. Your card, UPI or net-banking details stay inside Razorpay.
                       </div>
                     )}
                   </div>
@@ -1137,7 +1193,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
 
                   <div className="bg-[#EBF5F0] p-3.5 rounded-xl border border-[#C2E2D3] flex items-center gap-2 text-[11px] text-[#0C4A34] font-semibold">
                     <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>{paymentMethod === "cod" ? "Cash on Delivery selected — no online payment is required to confirm this booking." : "Online payment selected — you will be redirected to the secure Razorpay checkout."}</span>
+                    <span>{paymentMethod === "cod" ? "Cash on Delivery selected — no online payment is required to confirm this booking." : "Online payment selected — secure Razorpay checkout will open after we create your payment order."}</span>
                   </div>
 
                   {submitError && (
