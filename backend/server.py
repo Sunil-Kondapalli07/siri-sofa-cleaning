@@ -1677,6 +1677,30 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                                 'booking_id': booking_id
                             })
 
+                    existing_link = str(booking['payment_gateway_link_id'] or '').strip()
+                    if existing_link:
+                        link_check_status, link_check = razorpay_request_json(
+                            "GET",
+                            f"https://api.razorpay.com/v1/payment_links/{urllib.parse.quote(existing_link, safe='')}",
+                            key_id,
+                            key_secret,
+                        )
+                        if 200 <= link_check_status < 300:
+                            existing_short_url = str(link_check.get('short_url') or '').strip()
+                            existing_link_state = str(link_check.get('status') or '').lower()
+                            if existing_short_url and existing_link_state in ('created', 'partially_paid'):
+                                image_url = razorpay_payment_link_qr_data_url(existing_short_url)
+                                return self.send_json(200, {
+                                    'success': True,
+                                    'qr_id': existing_link,
+                                    'image_url': image_url,
+                                    'payment_url': existing_short_url,
+                                    'amount': amount_paise,
+                                    'currency': 'INR',
+                                    'booking_id': booking_id,
+                                    'qr_source': 'razorpay_payment_link'
+                                })
+
                     qr_status, qr_data = razorpay_request_json(
                         "POST",
                         "https://api.razorpay.com/v1/payments/qr_codes",
