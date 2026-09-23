@@ -41,6 +41,52 @@ function locationErrorMessage(error: GeolocationPositionError): string {
   }
 }
 
+async function reverseGeocode(latitude: number, longitude: number): Promise<Partial<SavedLocation>> {
+  const response = await fetch(
+    `/api/location/reverse?lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}`,
+    { headers: { Accept: "application/json" }, cache: "no-store" }
+  );
+
+  let data: any = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.error || "Address lookup is temporarily unavailable.");
+  }
+
+  return {
+    display_name: data.display_name || "",
+    house_flat: data.house_flat || "",
+    street: data.street || "",
+    area: data.area || "",
+    city: data.city || "",
+    pincode: data.pincode || "",
+  };
+}
+
+export async function enrichSavedLocation(saved: SavedLocation | null = getSavedLocation()): Promise<SavedLocation | null> {
+  if (!saved) return null;
+
+  // Do not call the geocoder when we already have useful address data.
+  if (saved.street || saved.area || saved.pincode || saved.display_name) {
+    return saved;
+  }
+
+  try {
+    const address = await reverseGeocode(saved.latitude, saved.longitude);
+    const enriched = { ...saved, ...address };
+    localStorage.setItem(SAVED_LOCATION_KEY, JSON.stringify(enriched));
+    window.dispatchEvent(new CustomEvent("siri-location-updated"));
+    return enriched;
+  } catch {
+    return saved;
+  }
+}
+
 export async function requestAndSaveCurrentLocation(): Promise<SavedLocation> {
   if (typeof window === "undefined" || !("geolocation" in navigator)) {
     throw new Error("Location is not supported by this browser.");
@@ -62,35 +108,23 @@ export async function requestAndSaveCurrentLocation(): Promise<SavedLocation> {
     captured_at: new Date().toISOString(),
   };
 
-  // Persist coordinates immediately. Address enrichment is separate so a
-  // temporary geocoder failure never loses the customer's current location.
+  // GPS is useful even when address enrichment is temporarily unavailable.
   localStorage.setItem(SAVED_LOCATION_KEY, JSON.stringify(result));
   window.dispatchEvent(new CustomEvent("siri-location-updated"));
 
   try {
-    const response = await fetch(
-      `/api/location/reverse?lat=${encodeURIComponent(result.latitude)}&lon=${encodeURIComponent(result.longitude)}`,
-      { headers: { Accept: "application/json" }, cache: "no-store" }
-    );
-    if (response.ok) {
-      const data = await response.json();
-      Object.assign(result, {
-        display_name: data?.display_name || "",
-        house_flat: data?.house_flat || "",
-        street: data?.street || "",
-        area: data?.area || "",
-        city: data?.city || "",
-        pincode: data?.pincode || "",
-      });
-      localStorage.setItem(SAVED_LOCATION_KEY, JSON.stringify(result));
-      window.dispatchEvent(new CustomEvent("siri-location-updated"));
-    }
+    const address = await reverseGeocode(result.latitude, result.longitude);
+    const enriched = { ...result, ...address };
+    localStorage.setItem(SAVED_LOCATION_KEY, JSON.stringify(enriched));
+    window.dispatchEvent(new CustomEvent("siri-location-updated"));
+    return enriched;
   } catch {
-    // Keep coordinates; the customer can still enter/edit the address manually.
+    // Keep the verified coordinates and let the customer enter the missing
+    // human-readable address fields manually.
+    return result;
   }
-
-  return result;
 }
+
 export function clearSavedLocation() {
   if (typeof window !== "undefined") localStorage.removeItem(SAVED_LOCATION_KEY);
 }
