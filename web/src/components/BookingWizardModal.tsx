@@ -96,26 +96,31 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     return item ? item.quantity : 0;
   };
 
-  // Restore the last saved service location and request a fresh browser location after sign-in.
+  // Restore the saved location whenever the booking modal opens, and stay
+  // synchronized if another part of the app captures/updates location.
   useEffect(() => {
-    if (!user || typeof window === "undefined") return;
-    let cancelled = false;
-    const saved = getSavedLocation();
-    if (saved) {
-      queueMicrotask(() => {
-        if (cancelled) return;
-        setLocationCaptured(true);
-        if (saved.house_flat) setHouseFlat(saved.house_flat);
-        if (saved.street) setStreet(saved.street);
-        if (saved.area) setArea(saved.area);
-        if (saved.pincode) setPincode(saved.pincode);
-      });
-    }
-    if (isOpen) {
-      setLocationMessage("Tap “Use My Location” to allow location access and pre-fill your service address. You can change it anytime.");
-    }
-    return () => { cancelled = true; };
-  }, [user, isOpen]);
+    if (typeof window === "undefined") return;
+
+    const applySavedLocation = () => {
+      const saved = getSavedLocation();
+      if (!saved) return;
+      setLocationCaptured(true);
+      if (saved.house_flat) setHouseFlat(saved.house_flat);
+      if (saved.street) setStreet(saved.street);
+      if (saved.area) setArea(saved.area);
+      if (saved.city) setCity(saved.city);
+      if (saved.pincode) setPincode(saved.pincode);
+      setLocationMessage(
+        saved.display_name
+          ? `Location saved: ${saved.area || saved.city || saved.display_name}`
+          : "Location saved. Please confirm or edit your service address."
+      );
+    };
+
+    applySavedLocation();
+    window.addEventListener("siri-location-updated", applySavedLocation);
+    return () => window.removeEventListener("siri-location-updated", applySavedLocation);
+  }, [isOpen, user]);
 
   // Synchronize customer contact if logged-in user changes
   useEffect(() => {
