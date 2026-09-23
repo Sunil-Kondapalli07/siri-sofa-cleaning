@@ -10,6 +10,28 @@ const getApiBase = (): string => {
   return "";
 };
 
+async function parseJsonResponse<T = any>(res: Response): Promise<T> {
+  const contentType = res.headers.get("content-type") || "";
+  const raw = await res.text();
+
+  if (!raw.trim()) {
+    return { success: res.ok, error: res.ok ? undefined : `Request failed with HTTP ${res.status}` } as T;
+  }
+
+  if (!contentType.includes("application/json")) {
+    const detail = raw.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 240);
+    throw new Error(
+      `Server returned HTTP ${res.status} instead of JSON${detail ? `: ${detail}` : "."}`
+    );
+  }
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    throw new Error(`Server returned invalid JSON (HTTP ${res.status}).`);
+  }
+}
+
 async function fetchApi(endpoint: string, options: RequestInit = {}): Promise<Response> {
   const base = getApiBase();
   const targetUrl = `${base}${endpoint}`;
@@ -93,7 +115,7 @@ export const api = {
       headers: getHeaders(),
       body: JSON.stringify({ code, subtotal }),
     });
-    return await res.json();
+    return await parseJsonResponse(res);
   },
 
   // Bookings
@@ -108,14 +130,14 @@ export const api = {
       headers: getHeaders(),
       body: JSON.stringify(payload),
     });
-    return await res.json();
+    return await parseJsonResponse(res);
   },
 
   async getBookingById(id: string): Promise<{ booking?: Booking; error?: string }> {
     const res = await fetchApi(`/api/bookings/${encodeURIComponent(id)}`, {
       headers: getHeaders(),
     });
-    return await res.json();
+    return await parseJsonResponse(res);
   },
 
   async getCustomerBookings(): Promise<Booking[]> {
@@ -156,7 +178,7 @@ export const api = {
       headers: getHeaders(),
       body: JSON.stringify({ technician_id: technicianId }),
     });
-    return await res.json();
+    return await parseJsonResponse(res);
   },
 
   // Authentication
@@ -226,7 +248,7 @@ export const api = {
         otp: otp,
       }),
     });
-    return await res.json();
+    return await parseJsonResponse(res);
   },
 
   async requestPasswordReset(target: string): Promise<{
@@ -241,7 +263,7 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ target }),
     });
-    return await res.json();
+    return await parseJsonResponse(res);
   },
 
   async resetPassword(challengeId: string, otpCode: string, newPassword: string): Promise<{
@@ -258,7 +280,7 @@ export const api = {
         new_password: newPassword,
       }),
     });
-    return await res.json();
+    return await parseJsonResponse(res);
   },
 
   async googleLogin(profile: {
@@ -294,7 +316,7 @@ export const api = {
     const res = await fetchApi("/api/payments/razorpay/order", {
       method: "POST", headers: getHeaders(), body: JSON.stringify({ booking_id: bookingId })
     });
-    return await res.json();
+    return await parseJsonResponse(res);
   },
 
   async verifyRazorpayPayment(payload: {
@@ -306,7 +328,7 @@ export const api = {
     const res = await fetchApi("/api/payments/razorpay/verify", {
       method: "POST", headers: getHeaders(), body: JSON.stringify(payload)
     });
-    return await res.json();
+    return await parseJsonResponse(res);
   },
 
   async metaLogin(access_token: string) {
