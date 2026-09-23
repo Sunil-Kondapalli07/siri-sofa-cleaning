@@ -72,7 +72,14 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   const [locationCaptured, setLocationCaptured] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "razorpay">("cod");
 
-  useEffect(() => {\n    if (typeof window === "undefined" || document.getElementById("razorpay-checkout-script")) return;\n    const script = document.createElement("script");\n    script.id = "razorpay-checkout-script";\n    script.src = "https://checkout.razorpay.com/v1/checkout.js";\n    script.async = true;\n    document.head.appendChild(script);\n  }, []);\n\n  const activeServices = (services && services.length > 0) ? services : DEFAULT_SERVICES;
+  useEffect(() => {
+    if (typeof window === "undefined" || document.getElementById("razorpay-checkout-script")) return;
+    const script = document.createElement("script");
+    script.id = "razorpay-checkout-script";
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    document.head.appendChild(script);
+  }, []);\n\n  const activeServices = (services && services.length > 0) ? services : DEFAULT_SERVICES;
   const [activeCatalogCategory, setActiveCatalogCategory] = useState<string>("sofa");
   const [showCatalogPicker, setShowCatalogPicker] = useState<boolean>(true);
 
@@ -102,11 +109,11 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
         if (saved.pincode) setPincode(saved.pincode);
       });
     }
-    queueMicrotask(() => {
-      if (!cancelled) setLocationMessage("Allow location access so we can pre-fill your service address. You can change it anytime.");
-    });
+    if (isOpen) {
+      setLocationMessage("Tap “Use My Location” to allow location access and pre-fill your service address. You can change it anytime.");
+    }
     return () => { cancelled = true; };
-  }, [user]);
+  }, [user, isOpen]);
 
   // Synchronize customer contact if logged-in user changes
   useEffect(() => {
