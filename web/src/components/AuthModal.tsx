@@ -323,6 +323,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           setRequiresOtp(true);
           setMobileChallenge(res.mobile_challenge_id || "");
           setEmailChallenge(res.email_challenge_id || "");
+          if (res.test_mode && (res.test_mobile_otp || res.test_email_otp)) {
+            setSuccessMessage(
+              `TEST MODE — Mobile OTP: ${res.test_mobile_otp || "N/A"} • Email OTP: ${res.test_email_otp || "N/A"}`
+            );
+          }
         } else {
           onLoginSuccess(res.user);
           onClose();
