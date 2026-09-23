@@ -1543,6 +1543,98 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     'booking_id': booking_id
                 })
 
+            # POST /api/payments/razorpay/qr
+            elif path == '/api/payments/razorpay/qr':
+                caller = self.get_authenticated_user(conn)
+                if not caller:
+                    return self.send_json(401, {'error': 'Authentication required'})
+
+                booking_id = str(payload.get('booking_id', '')).strip()
+                if not booking_id:
+                    return self.send_json(400, {'error': 'booking_id is required'})
+
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM bookings WHERE id=?", (booking_id,))
+                booking = cursor.fetchone()
+                if not booking:
+                    return self.send_json(404, {'error': 'Booking not found'})
+                if caller['role'] != 'admin' and str(booking['user_id']) != str(caller['id']):
+                    return self.send_json(403, {'error': 'Access denied'})
+                if str(booking['payment_status'] or '').lower() == 'paid':
+                    return self.send_json(409, {'error': 'This booking is already paid.'})
+
+                key_id = os.environ.get('RAZORPAY_KEY_ID', '').strip()
+                key_secret = os.environ.get('RAZORPAY_KEY_SECRET', '').strip()
+                if not key_id or not key_secret:
+                    return self.send_json(503, {'error': 'Razorpay is not configured on the server.'})
+
+                amount_paise = int(round(float(booking['total_amount']) * 100))
+                existing_qr = str(booking['payment_gateway_qr_id'] or '').strip()
+                try:
+                    if existing_qr:
+                        qr_status, qr_data = razorpay_request_json(
+                            "GET",
+                            f"https://api.razorpay.com/v1/payments/qr_codes/{urllib.parse.quote(existing_qr, safe='')}",
+                            key_id,
+                            key_secret,
+                        )
+                        if 200 <= qr_status < 300 and qr_data.get('id') == existing_qr and qr_data.get('status') == 'active':
+                            return self.send_json(200, {
+                                'success': True,
+                                'qr_id': existing_qr,
+                                'image_url': qr_data.get('image_url'),
+                                'amount': amount_paise,
+                                'currency': 'INR',
+                                'booking_id': booking_id
+                            })
+
+                    qr_status, qr_data = razorpay_request_json(
+                        "POST",
+                        "https://api.razorpay.com/v1/payments/qr_codes",
+                        key_id,
+                        key_secret,
+                        {
+                            "type": "upi_qr",
+                            "name": "Siri Sofa Services",
+                            "usage": "single_use",
+                            "fixed_amount": True,
+                            "payment_amount": amount_paise,
+                            "description": f"Siri Sofa booking {booking_id}",
+                            "close_by": int(time.time()) + 1800,
+                            "notes": {"booking_id": booking_id},
+                        },
+                    )
+                except (RuntimeError, TimeoutError) as exc:
+                    return self.send_json(502, {'error': str(exc)})
+
+                if qr_status < 200 or qr_status >= 300:
+                    provider_error = qr_data.get('error') or {}
+                    description = provider_error.get('description') or provider_error.get('reason') or f'Razorpay returned HTTP {qr_status}'
+                    return self.send_json(502, {'error': f'Razorpay could not create the dedicated UPI QR: {description}'})
+
+                qr_id = str(qr_data.get('id') or '').strip()
+                image_url = str(qr_data.get('image_url') or '').strip()
+                if not qr_id or not image_url:
+                    return self.send_json(502, {'error': 'Razorpay returned an incomplete UPI QR response.'})
+
+                cursor.execute(
+                    "UPDATE bookings SET payment_method='razorpay', payment_status='created', payment_gateway_qr_id=?, updated_at=? WHERE id=?",
+                    (qr_id, now, booking_id)
+                )
+                cursor.execute(
+                    "UPDATE payments SET status='created', updated_at=? WHERE booking_id=?",
+                    (now, booking_id)
+                )
+                conn.commit()
+                return self.send_json(200, {
+                    'success': True,
+                    'qr_id': qr_id,
+                    'image_url': image_url,
+                    'amount': amount_paise,
+                    'currency': 'INR',
+                    'booking_id': booking_id
+                })
+
             # POST /api/payments/razorpay/verify
             elif path == '/api/payments/razorpay/verify':
                 caller = self.get_authenticated_user(conn)
