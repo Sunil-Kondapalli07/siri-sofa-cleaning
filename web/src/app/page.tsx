@@ -15,6 +15,7 @@ import { BookingTrackerModal } from "@/components/BookingTrackerModal";
 import { AuthModal } from "@/components/AuthModal";
 import { AdminModal } from "@/components/AdminModal";
 import { DEFAULT_SERVICES } from "@/lib/defaultData";
+import { requestAndSaveCurrentLocation } from "@/lib/location";
 
 export default function Home() {
   const [services, setServices] = useState<Service[]>(DEFAULT_SERVICES);
