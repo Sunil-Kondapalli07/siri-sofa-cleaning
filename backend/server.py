@@ -18,6 +18,7 @@ import string
 import secrets
 import hmac
 from datetime import datetime, date, timedelta
+from qrcodegen import QrCode
 
 from database import get_connection, hash_password, verify_password, hash_otp, verify_otp_hash, DB_PATH, init_db
 from notifications import dispatch_verification_code, generate_secure_otp, load_dotenv
@@ -135,6 +136,38 @@ def create_razorpay_ssl_context() -> ssl.SSLContext:
         return ssl.create_default_context(cafile=certifi.where())
     except ImportError:
         return ssl.create_default_context()
+
+def razorpay_payment_link_qr_data_url(payment_url: str) -> str:
+    """Generate a QR image locally from a Razorpay hosted Payment Link.
+
+    No QR package or external QR service is used at runtime. The payload is only
+    the Razorpay short URL, so scanning opens Razorpay's hosted payment page.
+    """
+    if not payment_url or not payment_url.startswith(("https://", "http://")):
+        raise ValueError("Invalid Razorpay payment URL")
+    qr = QrCode.encode_text(payment_url, QrCode.Ecc.MEDIUM)
+    border = 4
+    scale = 8
+    size = qr.get_size()
+    viewbox = size + border * 2
+    paths = []
+    for y in range(size):
+        run_start = None
+        for x in range(size + 1):
+            dark = x < size and qr.get_module(x, y)
+            if dark and run_start is None:
+                run_start = x
+            elif not dark and run_start is not None:
+                paths.append(f"M{run_start + border},{y + border}h{x - run_start}v1h-{x - run_start}z")
+                run_start = None
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {viewbox} {viewbox}" '
+        f'width="{viewbox * scale}" height="{viewbox * scale}" shape-rendering="crispEdges">'
+        f'<rect width="100%" height="100%" fill="white"/>'
+        f'<path d="{" ".join(paths)}" fill="black"/>'
+        f'</svg>'
+    )
+    return "data:image/svg+xml;charset=utf-8," + urllib.parse.quote(svg, safe="")
 
 def create_razorpay_order(key_id: str, key_secret: str, amount_paise: int, receipt: str) -> dict:
     """Create a Razorpay order with server-only credentials."""
@@ -1664,15 +1697,9 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                         short_url = str(link_data.get('short_url') or '').strip()
                         if link_id and short_url:
                             try:
-                                import qrcode
-                                from io import BytesIO
-                                import base64
-                                qr_img = qrcode.make(short_url)
-                                buf = BytesIO()
-                                qr_img.save(buf, format='PNG')
-                                image_url = 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode('ascii')
+                                image_url = razorpay_payment_link_qr_data_url(short_url)
                             except Exception as exc:
-                                return self.send_json(503, {'error': 'UPI QR fallback is unavailable because the server QR generator is not installed.'})
+                                return self.send_json(502, {'error': f'Could not generate the UPI QR: {exc}'})
 
                             cursor.execute(
                                 "UPDATE bookings SET payment_method='upi_qr', payment_status='created', payment_gateway_link_id=?, updated_at=? WHERE id=?",
