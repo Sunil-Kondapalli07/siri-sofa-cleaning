@@ -137,6 +137,23 @@ def create_razorpay_ssl_context() -> ssl.SSLContext:
     except ImportError:
         return ssl.create_default_context()
 
+def test_upi_qr_data_url(amount_paise: int, booking_id: str) -> str:
+    """Generate a visible Test Mode UPI QR without creating a live/test Razorpay resource.
+
+    Razorpay's sandbox simulates UPI inside Checkout; it does not make this QR
+    payload a real bank transaction. The payload is intentionally labeled as test data.
+    """
+    if amount_paise < 100:
+        raise ValueError("Payment amount must be at least ₹1")
+    query = urllib.parse.urlencode({
+        "pa": "success@razorpay",
+        "pn": "Siri Sofa Services TEST",
+        "am": f"{amount_paise / 100:.2f}",
+        "cu": "INR",
+        "tn": f"TEST {booking_id}",
+    })
+    return razorpay_payment_link_qr_data_url(f"upi://pay?{query}")
+
 def razorpay_payment_link_qr_data_url(payment_url: str) -> str:
     """Generate a QR image locally from a Razorpay hosted Payment Link.
 
@@ -1659,6 +1676,27 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
 
                 amount_paise = int(round(float(booking['total_amount']) * 100))
                 existing_link = str(booking['payment_gateway_link_id'] or '').strip()
+
+                # Razorpay Test Mode does not create UPI Payment Links for real QR payments.
+                # Still render a deterministic local QR so QA can verify QR generation,
+                # exact amount encoding and scanner recognition without charging money.
+                if key_id.startswith('rzp_test_'):
+                    try:
+                        image_url = test_upi_qr_data_url(amount_paise, booking_id)
+                    except Exception as exc:
+                        return self.send_json(502, {'error': f'Could not generate the Test UPI QR locally: {exc}'})
+                    return self.send_json(200, {
+                        'success': True,
+                        'qr_id': f'test_{booking_id}',
+                        'image_url': image_url,
+                        'payment_url': None,
+                        'amount': amount_paise,
+                        'currency': 'INR',
+                        'booking_id': booking_id,
+                        'qr_source': 'razorpay_test_upi_qr',
+                        'test_mode': True,
+                        'payment_status': 'simulation_only',
+                    })
 
                 try:
                     # QR checkout for Siri Sofa is backed by a Razorpay Payment Link.
