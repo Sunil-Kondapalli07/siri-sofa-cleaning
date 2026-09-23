@@ -5,4 +5,3 @@
 # - sqlite3 (Database)
 # - smtplib & email (Real SMTP Email Gateway)
 # - urllib.request & ssl (Fast2SMS & Twilio HTTP Gateways)
-qrcode
