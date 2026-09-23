@@ -5,7 +5,7 @@ import { Service, ServiceVariant, CartItem, AvailableSlot, User } from "@/types"
 import { api } from "@/lib/api";
 import { DEFAULT_SERVICES } from "@/lib/defaultData";
 import { getSavedLocation, requestAndSaveCurrentLocation, SavedLocation } from "@/lib/location";
-import { X, Check, ArrowRight, ArrowLeft, Sparkles, AlertCircle, Lock, Plus, Minus } from "lucide-react";
+import { X, Check, ArrowRight, ArrowLeft, Sparkles, AlertCircle, Lock, Plus, Minus, QrCode } from "lucide-react";
 
 interface BookingWizardModalProps {
   isOpen: boolean;
