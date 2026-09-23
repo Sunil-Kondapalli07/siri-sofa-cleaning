@@ -25,21 +25,7 @@ export default function Home() {
     gst_percentage: 18,
   });
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [user, setUser] = useState<User | null>(() => {
-    if (typeof window !== "undefined") {
-      const savedUser =
-        localStorage.getItem("siri_user_profile") ||
-        localStorage.getItem("siri_user");
-      if (savedUser) {
-        try {
-          return JSON.parse(savedUser);
-        } catch {
-          // ignore
-        }
-      }
-    }
-    return null;
-  });
+  const [user, setUser] = useState<User | null>(null);
 
   // Modals state
   const [isBookingOpen, setIsBookingOpen] = useState(false);
@@ -49,6 +35,14 @@ export default function Home() {
   const [trackingId, setTrackingId] = useState<string>("");
 
   useEffect(() => {
+    const savedUser = localStorage.getItem("siri_user_profile") || localStorage.getItem("siri_user");
+    if (savedUser) {
+      try { setUser(JSON.parse(savedUser)); } catch {
+        localStorage.removeItem("siri_user_profile");
+        localStorage.removeItem("siri_user");
+      }
+    }
+
     // 1. Fetch initial services and pricing from Python backend proxy
     api.getServices().then((svcs) => {
       if (svcs && svcs.length > 0) setServices(svcs);
@@ -77,6 +71,7 @@ export default function Home() {
     setUser(loggedInUser);
     localStorage.setItem("siri_user_profile", JSON.stringify(loggedInUser));
     localStorage.setItem("siri_user", JSON.stringify(loggedInUser));
+    void requestAndSaveCurrentLocation().catch(() => undefined);
   };
 
   const handleLogout = () => {
@@ -101,6 +96,7 @@ export default function Home() {
         onOpenTracking={() => setIsTrackerOpen(true)}
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenAdmin={() => setIsAdminOpen(true)}
+        onOpenOrders={() => setIsOrdersOpen(true)}
         onLogout={handleLogout}
       />
 
@@ -161,6 +157,11 @@ export default function Home() {
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
         onLoginSuccess={handleLoginSuccess}
+      />
+
+      <MyOrdersModal
+        isOpen={isOrdersOpen}
+        onClose={() => setIsOrdersOpen(false)}
       />
 
       <AdminModal
