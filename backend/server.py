@@ -17,6 +17,7 @@ import re
 import string
 import secrets
 import hmac
+import base64
 from datetime import datetime, date, timedelta
 from qrcodegen import QrCode
 
@@ -184,7 +185,8 @@ def razorpay_payment_link_qr_data_url(payment_url: str) -> str:
         f'<path d="{" ".join(paths)}" fill="black"/>'
         f'</svg>'
     )
-    return "data:image/svg+xml;charset=utf-8," + urllib.parse.quote(svg, safe="")
+    encoded = base64.b64encode(svg.encode("utf-8")).decode("ascii")
+    return "data:image/svg+xml;base64," + encoded
 
 def create_razorpay_order(key_id: str, key_secret: str, amount_paise: int, receipt: str) -> dict:
     """Create a Razorpay order with server-only credentials."""
