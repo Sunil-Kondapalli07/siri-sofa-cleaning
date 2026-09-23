@@ -781,6 +781,28 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
               {/* Step 3: Hyderabad Service Address */}
               {step === 3 && (
                 <div className="space-y-4">
+                  <div className="rounded-2xl border border-[#C2E2D3] bg-[#EBF5F0] p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="text-sm font-black text-[#0C4A34]">📍 Use your current location</div>
+                        <p className="text-[11px] text-[#525D6C] mt-1">
+                          Allow location access to automatically fill your service address. Your location is used for this booking and you can edit the address below.
+                        </p>
+                        {locationMessage && (
+                          <p className="text-[11px] font-semibold text-[#0C4A34] mt-2">{locationMessage}</p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleUseCurrentLocation}
+                        disabled={locationLoading}
+                        className="shrink-0 rounded-xl bg-[#0C4A34] px-4 py-2.5 text-[11px] font-black text-white disabled:opacity-60"
+                      >
+                        {locationLoading ? "Locating..." : locationCaptured ? "Update Location" : "Use My Location"}
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-[#121820] mb-1.5">
