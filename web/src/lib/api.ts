@@ -194,6 +194,9 @@ export const api = {
     requires_verification?: boolean;
     mobile_challenge_id?: string;
     email_challenge_id?: string;
+    test_mode?: boolean;
+    test_mobile_otp?: string | null;
+    test_email_otp?: string;
     error?: string;
   }> {
     const res = await fetchApi("/api/auth/register", {
