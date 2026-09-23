@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Service, ServiceVariant, CartItem, AvailableSlot, User } from "@/types";
 import { api } from "@/lib/api";
 import { DEFAULT_SERVICES } from "@/lib/defaultData";
-import { getSavedLocation, requestAndSaveCurrentLocation, enrichSavedLocation, SavedLocation } from "@/lib/location";
+import { getSavedLocation, requestAndSaveCurrentLocation, SavedLocation } from "@/lib/location";
 import { X, Check, ArrowRight, ArrowLeft, Sparkles, AlertCircle, Lock, Plus, Minus } from "lucide-react";
 
 interface BookingWizardModalProps {
@@ -96,8 +96,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     return item ? item.quantity : 0;
   };
 
-  // Restore the saved location whenever the booking modal opens, and stay
-  // synchronized if another part of the app captures/updates location.
+  // Restore and live-sync the saved location with the booking form.
   useEffect(() => {
     if (typeof window === "undefined") return;
     let cancelled = false;
@@ -105,24 +104,18 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     const applyLocation = (saved: SavedLocation | null) => {
       if (!saved || cancelled) return;
       setLocationCaptured(true);
-      if (saved.house_flat) setHouseFlat(saved.house_flat);
-      if (saved.street) setStreet(saved.street);
-      if (saved.area) setArea(saved.area);
-      if (saved.pincode) setPincode(saved.pincode);
+      setHouseFlat(saved.house_flat || "");
+      setStreet(saved.street || "");
+      setArea(saved.area || "");
+      setPincode(saved.pincode || "");
       setLocationMessage(
         saved.display_name || saved.street || saved.area
-          ? "Current location applied. Please confirm or edit your address."
-          : "GPS location saved. Enter your House / Flat and Landmark."
+          ? "Current location applied. Please confirm the address and add your house/flat details if needed."
+          : "GPS location saved, but address details could not be resolved. Please enter the address manually."
       );
     };
 
-    const applySavedLocation = () => {
-      const saved = getSavedLocation();
-      applyLocation(saved);
-      if (saved && !saved.display_name && !saved.street && !saved.pincode) {
-        void enrichSavedLocation(saved).then((enriched) => applyLocation(enriched));
-      }
-    };
+    const applySavedLocation = () => applyLocation(getSavedLocation());
 
     applySavedLocation();
     window.addEventListener("siri-location-updated", applySavedLocation);
@@ -304,7 +297,11 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
       if (saved.area) setArea(saved.area);
       if (saved.pincode) setPincode(saved.pincode);
       setLocationCaptured(true);
-      setLocationMessage("Location captured. Review the address below and change anything that is incorrect.");
+      setLocationMessage(
+        saved.display_name || saved.street || saved.area
+          ? "Current location applied. Please confirm the address and add your house/flat details if needed."
+          : "GPS captured, but the address could not be resolved. Please enter the address manually."
+      );
     } catch (error) {
       setLocationMessage(error instanceof Error ? error.message : "Location permission was denied or unavailable. You can enter the address manually.");
     } finally {
