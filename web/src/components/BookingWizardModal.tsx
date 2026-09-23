@@ -119,6 +119,23 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     }
   }, [user]);
 
+  // Every new booking starts with a clean wizard state. The modal stays mounted
+  // in the page, so closing it must explicitly clear the previous success screen.
+  useEffect(() => {
+    if (!isOpen) return;
+    setStep(1);
+    setCompletedBookingId(null);
+    setIsSubmitting(false);
+    setSubmitError("");
+    setCouponCode("");
+    setCouponDiscount(0);
+    setCouponError("");
+    setCouponApplied(false);
+    setPaymentMethod("cod");
+    setServiceDate(getTomorrowDateString());
+    setServiceSlot("");
+  }, [isOpen]);
+
   // Load available slots when serviceDate changes
   useEffect(() => {
     if (!serviceDate) return;
