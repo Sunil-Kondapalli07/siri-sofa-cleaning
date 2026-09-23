@@ -10,6 +10,7 @@ interface NavbarProps {
   onOpenTracking: () => void;
   onOpenAuth: () => void;
   onOpenAdmin: () => void;
+  onOpenOrders: () => void;
   onLogout: () => void;
 }
 
@@ -19,6 +20,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenTracking,
   onOpenAuth,
   onOpenAdmin,
+  onOpenOrders,
   onLogout,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
