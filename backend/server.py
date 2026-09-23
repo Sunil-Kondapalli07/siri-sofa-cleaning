@@ -4,10 +4,12 @@ import json
 import os
 import mimetypes
 import socket
+import sys
 import ssl
 import urllib.parse
 import urllib.request
 import subprocess
+import shutil
 import sqlite3
 import random
 import re
@@ -76,9 +78,16 @@ def razorpay_request_json(
     config_lines.append('write-out = "\\n%{http_code}"')
     config = "\n".join(config_lines) + "\n"
 
+    curl_bin = os.environ.get("RAZORPAY_CURL_BIN", "").strip()
+    if not curl_bin:
+        if sys.platform == "darwin" and os.path.exists("/usr/bin/curl"):
+            curl_bin = "/usr/bin/curl"
+        else:
+            curl_bin = shutil.which("curl") or "curl"
+
     try:
         proc = subprocess.run(
-            ["curl", "--config", "-"],
+            [curl_bin, "--config", "-"],
             input=config.encode("utf-8"),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -142,7 +151,6 @@ def create_razorpay_order(key_id: str, key_secret: str, amount_paise: int, recei
             "amount": amount_paise,
             "currency": "INR",
             "receipt": receipt,
-            "payment_capture": 1,
         },
     )
 
@@ -385,6 +393,89 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                         'success': False,
                         'error': 'Location captured, but address lookup is temporarily unavailable.'
                     })
+
+            # GET /api/payments/razorpay/status?booking_id=<id>
+            elif path == '/api/payments/razorpay/status':
+                caller = self.get_authenticated_user(conn)
+                if not caller:
+                    return self.send_json(401, {'error': 'Authentication required'})
+
+                booking_id = str(query.get('booking_id', [''])[0]).strip()
+                if not booking_id:
+                    return self.send_json(400, {'error': 'booking_id is required'})
+
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM bookings WHERE id=?", (booking_id,))
+                booking = cursor.fetchone()
+                if not booking:
+                    return self.send_json(404, {'error': 'Booking not found'})
+                if caller['role'] != 'admin' and str(booking['user_id']) != str(caller['id']):
+                    return self.send_json(403, {'error': 'Access denied'})
+
+                current_status = str(booking['payment_status'] or 'pending').lower()
+                if current_status == 'paid':
+                    return self.send_json(200, {'success': True, 'payment_status': 'paid', 'booking_id': booking_id})
+
+                key_id = os.environ.get('RAZORPAY_KEY_ID', '').strip()
+                key_secret = os.environ.get('RAZORPAY_KEY_SECRET', '').strip()
+                order_id = str(booking['payment_gateway_order_id'] or '').strip()
+                if not key_id or not key_secret or not order_id:
+                    return self.send_json(200, {'success': True, 'payment_status': current_status, 'booking_id': booking_id})
+
+                try:
+                    status_code, gateway = razorpay_request_json(
+                        "GET",
+                        f"https://api.razorpay.com/v1/orders/{urllib.parse.quote(order_id, safe='')}/payments",
+                        key_id,
+                        key_secret,
+                    )
+                except (RuntimeError, TimeoutError) as exc:
+                    return self.send_json(502, {'error': str(exc)})
+
+                if status_code < 200 or status_code >= 300:
+                    return self.send_json(502, {'error': 'Razorpay could not return the payment status.'})
+
+                payments = gateway.get('items') if isinstance(gateway.get('items'), list) else []
+                amount_paise = int(round(float(booking['total_amount']) * 100))
+                captured = next(
+                    (
+                        p for p in payments
+                        if p.get('status') == 'captured'
+                        and p.get('order_id') == order_id
+                        and int(p.get('amount') or 0) == amount_paise
+                        and p.get('currency') == 'INR'
+                    ),
+                    None
+                )
+                if captured:
+                    cursor.execute(
+                        "UPDATE bookings SET payment_status='paid', payment_gateway_payment_id=?, updated_at=? WHERE id=?",
+                        (captured.get('id'), now, booking_id)
+                    )
+                    cursor.execute(
+                        "UPDATE payments SET payment_id=?, method=?, status='paid', raw_response=?, updated_at=? WHERE booking_id=?",
+                        (captured.get('id'), captured.get('method'), json.dumps(captured), now, booking_id)
+                    )
+                    conn.commit()
+                    return self.send_json(200, {
+                        'success': True,
+                        'payment_status': 'paid',
+                        'payment_id': captured.get('id'),
+                        'payment_method': captured.get('method'),
+                        'booking_id': booking_id
+                    })
+
+                failed = any(
+                    p.get('status') == 'failed'
+                    and p.get('order_id') == order_id
+                    and int(p.get('amount') or 0) == amount_paise
+                    for p in payments
+                )
+                return self.send_json(200, {
+                    'success': True,
+                    'payment_status': 'failed' if failed else 'pending',
+                    'booking_id': booking_id
+                })
 
             # GET /api/services
             elif path == '/api/services':
@@ -1483,7 +1574,7 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 status_code, gateway_payment = razorpay_request_json(
                     "GET",
                     f"https://api.razorpay.com/v1/payments/{urllib.parse.quote(payment_id, safe='')}",
-                    key_id=caller.get('_razorpay_key_id') or os.environ.get('RAZORPAY_KEY_ID', '').strip(),
+                    key_id=key_id,
                     key_secret=key_secret,
                 )
                 if status_code < 200 or status_code >= 300:
@@ -1527,6 +1618,13 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 event = payload.get('event','')
                 new_status = 'paid' if event in ('payment.captured','order.paid') else ('failed' if event=='payment.failed' else 'created')
                 if order_id:
+                    cursor.execute("SELECT total_amount FROM bookings WHERE payment_gateway_order_id=?", (order_id,))
+                    matched_booking = cursor.fetchone()
+                    if event == 'payment.captured' and matched_booking:
+                        expected_amount = int(round(float(matched_booking['total_amount']) * 100))
+                        actual_amount = int(entity.get('amount') or 0)
+                        if actual_amount != expected_amount or entity.get('currency') != 'INR':
+                            return self.send_json(400, {'error': 'Payment amount or currency mismatch'})
                     cursor.execute("UPDATE bookings SET payment_status=?,payment_gateway_payment_id=COALESCE(?,payment_gateway_payment_id),updated_at=? WHERE payment_gateway_order_id=?",(new_status,payment_id,now,order_id))
                     cursor.execute("UPDATE payments SET status=?,payment_id=COALESCE(?,payment_id),updated_at=? WHERE order_id=?",(new_status,payment_id,now,order_id))
                 conn.commit()
