@@ -453,8 +453,64 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                 key_id = os.environ.get('RAZORPAY_KEY_ID', '').strip()
                 key_secret = os.environ.get('RAZORPAY_KEY_SECRET', '').strip()
                 order_id = str(booking['payment_gateway_order_id'] or '').strip()
-                if not key_id or not key_secret or not order_id:
+                link_id = str(booking['payment_gateway_link_id'] or '').strip()
+
+                if not key_id or not key_secret or (not order_id and not link_id):
                     return self.send_json(200, {'success': True, 'payment_status': current_status, 'booking_id': booking_id})
+
+                amount_paise = int(round(float(booking['total_amount']) * 100))
+
+                # Payment-link QR fallback: Razorpay returns the captured payment
+                # inside the Payment Link resource itself.
+                if link_id and not order_id:
+                    try:
+                        link_status, link_data = razorpay_request_json(
+                            "GET",
+                            f"https://api.razorpay.com/v1/payment_links/{urllib.parse.quote(link_id, safe='')}",
+                            key_id,
+                            key_secret,
+                        )
+                    except (RuntimeError, TimeoutError) as exc:
+                        return self.send_json(502, {'error': str(exc)})
+
+                    if link_status < 200 or link_status >= 300:
+                        return self.send_json(502, {'error': 'Razorpay could not return the payment-link status.'})
+
+                    link_payments = link_data.get('payments') if isinstance(link_data.get('payments'), list) else []
+                    captured = next(
+                        (
+                            p for p in link_payments
+                            if p.get('status') == 'captured'
+                            and int(p.get('amount') or 0) == amount_paise
+                            and p.get('currency') == 'INR'
+                        ),
+                        None
+                    )
+                    if captured or link_data.get('status') == 'paid':
+                        payment_id = captured.get('id') if captured else None
+                        cursor.execute(
+                            "UPDATE bookings SET payment_status='paid', payment_gateway_payment_id=?, updated_at=? WHERE id=?",
+                            (payment_id, now, booking_id)
+                        )
+                        cursor.execute(
+                            "UPDATE payments SET payment_id=?, method=?, status='paid', raw_response=?, updated_at=? WHERE booking_id=?",
+                            (payment_id, captured.get('method') if captured else 'upi', json.dumps(captured or link_data), now, booking_id)
+                        )
+                        conn.commit()
+                        return self.send_json(200, {
+                            'success': True,
+                            'payment_status': 'paid',
+                            'payment_id': payment_id,
+                            'payment_method': captured.get('method') if captured else 'upi',
+                            'booking_id': booking_id
+                        })
+
+                    link_state = str(link_data.get('status') or '').lower()
+                    return self.send_json(200, {
+                        'success': True,
+                        'payment_status': 'failed' if link_state in ('expired', 'cancelled') else 'pending',
+                        'booking_id': booking_id
+                    })
 
                 try:
                     status_code, gateway = razorpay_request_json(
@@ -470,7 +526,6 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     return self.send_json(502, {'error': 'Razorpay could not return the payment status.'})
 
                 payments = gateway.get('items') if isinstance(gateway.get('items'), list) else []
-                amount_paise = int(round(float(booking['total_amount']) * 100))
                 captured = next(
                     (
                         p for p in payments
