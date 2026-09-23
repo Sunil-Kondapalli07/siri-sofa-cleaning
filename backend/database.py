@@ -194,6 +194,7 @@ def init_db(db_path: str = DB_PATH):
         payment_gateway_order_id TEXT,
         payment_gateway_payment_id TEXT,
         payment_gateway_qr_id TEXT,
+        payment_gateway_link_id TEXT,
         technician_id INTEGER,
         notes TEXT,
         created_at TEXT NOT NULL,
@@ -264,7 +265,8 @@ def init_db(db_path: str = DB_PATH):
         "ALTER TABLE bookings ADD COLUMN payment_status TEXT NOT NULL DEFAULT 'pending'",
         "ALTER TABLE bookings ADD COLUMN payment_gateway_order_id TEXT",
         "ALTER TABLE bookings ADD COLUMN payment_gateway_payment_id TEXT",
-        "ALTER TABLE bookings ADD COLUMN payment_gateway_qr_id TEXT"
+        "ALTER TABLE bookings ADD COLUMN payment_gateway_qr_id TEXT",
+        "ALTER TABLE bookings ADD COLUMN payment_gateway_link_id TEXT"
     ]:
         try:
             cursor.execute(statement)
