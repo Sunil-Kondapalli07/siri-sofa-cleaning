@@ -203,6 +203,56 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
             if path == '/api/health':
                 return self.send_json(200, {'status': 'healthy', 'service': 'Siri Sofa Services'})
 
+            # GET /api/location/reverse?lat=<latitude>&lon=<longitude>
+            elif path == '/api/location/reverse':
+                try:
+                    latitude = float(query.get('lat', [''])[0])
+                    longitude = float(query.get('lon', [''])[0])
+                except (TypeError, ValueError):
+                    return self.send_json(400, {'error': 'Valid latitude and longitude are required'})
+
+                if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+                    return self.send_json(400, {'error': 'Invalid latitude or longitude'})
+
+                try:
+                    import urllib.request
+                    reverse_url = (
+                        "https://nominatim.openstreetmap.org/reverse"
+                        f"?format=jsonv2&lat={urllib.parse.quote(str(latitude))}"
+                        f"&lon={urllib.parse.quote(str(longitude))}&zoom=18&addressdetails=1"
+                    )
+                    req = urllib.request.Request(
+                        reverse_url,
+                        headers={
+                            'Accept': 'application/json',
+                            'User-Agent': 'SiriSofaServices/1.0 (customer-location)'
+                        }
+                    )
+                    with urllib.request.urlopen(req, timeout=8) as resp:
+                        data = json.loads(resp.read().decode('utf-8'))
+                    address = data.get('address') or {}
+                    return self.send_json(200, {
+                        'success': True,
+                        'display_name': data.get('display_name') or '',
+                        'house_flat': address.get('house_number') or '',
+                        'street': address.get('road') or address.get('neighbourhood') or '',
+                        'area': (
+                            address.get('suburb')
+                            or address.get('neighbourhood')
+                            or address.get('city_district')
+                            or address.get('city')
+                            or address.get('town')
+                            or ''
+                        ),
+                        'city': address.get('city') or address.get('town') or address.get('village') or '',
+                        'pincode': address.get('postcode') or ''
+                    })
+                except Exception:
+                    return self.send_json(502, {
+                        'success': False,
+                        'error': 'Location captured, but address lookup is temporarily unavailable.'
+                    })
+
             # GET /api/services
             elif path == '/api/services':
                 cursor = conn.cursor()
