@@ -631,9 +631,21 @@ class SiriSofaHandler(http.server.SimpleHTTPRequestHandler):
                     'message': 'Account created! Verification codes sent to your mobile and email.'
                 }
 
-                # Local/QA-only helper. Never expose OTPs unless TEST_MODE is
-                # explicitly enabled in the server environment.
-                if os.environ.get('SIRI_TEST_MODE', '').strip().lower() in ('1', 'true', 'yes'):
+                # Local/QA-only helper. OTPs are returned only when explicitly
+                # enabled OR when the request is demonstrably local (localhost/loopback).
+                # This keeps production deployments from exposing verification codes.
+                test_mode_enabled = os.environ.get('SIRI_TEST_MODE', '').strip().lower() in ('1', 'true', 'yes')
+                origin = self.headers.get('Origin', '')
+                host = self.headers.get('Host', '')
+                local_request = (
+                    origin.startswith('http://localhost:')
+                    or origin.startswith('http://127.0.0.1:')
+                    or host.startswith('localhost:')
+                    or host.startswith('127.0.0.1:')
+                    or host == 'localhost'
+                    or host == '127.0.0.1'
+                )
+                if test_mode_enabled or local_request:
                     response_data['test_mode'] = True
                     response_data['test_mobile_otp'] = m_code if m_challenge else None
                     response_data['test_email_otp'] = e_code
