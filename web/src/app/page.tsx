@@ -35,6 +35,7 @@ export default function Home() {
   const [isOrdersOpen, setIsOrdersOpen] = useState(false);
   const [locationPromptOpen, setLocationPromptOpen] = useState(false);
   const [locationPromptMessage, setLocationPromptMessage] = useState("");
+  const [savedLocationLabel, setSavedLocationLabel] = useState("");
   const [trackingId, setTrackingId] = useState<string>("");
 
   useEffect(() => {
@@ -58,17 +59,26 @@ export default function Home() {
   useEffect(() => {
     if (!user) {
       setLocationPromptOpen(false);
+      setSavedLocationLabel("");
       return;
     }
-    // Always show the in-app location control after sign-in. A previously saved
-    // coordinate must not hide the control because the customer may want to
-    // update/change their service location.
-    setLocationPromptMessage(
-      getSavedLocation()
-        ? "Your last service location is saved. Update it anytime."
-        : "Allow location so we can pre-fill your service address."
-    );
-    setLocationPromptOpen(true);
+
+    const syncLocation = () => {
+      const saved = getSavedLocation();
+      if (!saved) {
+        setSavedLocationLabel("");
+        setLocationPromptMessage("Allow location so we can pre-fill your service address.");
+        setLocationPromptOpen(true);
+        return;
+      }
+      setSavedLocationLabel(saved.area || saved.city || saved.display_name || "Current location saved");
+      setLocationPromptMessage("Your location is saved. You can update it anytime.");
+      setLocationPromptOpen(false);
+    };
+
+    syncLocation();
+    window.addEventListener("siri-location-updated", syncLocation);
+    return () => window.removeEventListener("siri-location-updated", syncLocation);
   }, [user]);
 
   const handleUpdateQuantity = (variant: ServiceVariant, newQty: number) => {
@@ -150,6 +160,12 @@ export default function Home() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {user && savedLocationLabel && (
+        <div className="fixed top-[76px] right-5 z-[45] rounded-full border border-[#C2E2D3] bg-white/95 px-4 py-2 shadow-lg backdrop-blur">
+          <span className="text-[11px] font-bold text-[#0C4A34]">📍 {savedLocationLabel}</span>
         </div>
       )}
 
