@@ -320,6 +320,15 @@ export const api = {
     return await parseJsonResponse(res);
   },
 
+  async createRazorpayQr(bookingId: string) {
+    const res = await fetchApi("/api/payments/razorpay/qr", {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({ booking_id: bookingId }),
+    });
+    return await parseJsonResponse(res);
+  },
+
   async createRazorpayOrder(bookingId: string) {
     const res = await fetchApi("/api/payments/razorpay/order", {
       method: "POST", headers: getHeaders(), body: JSON.stringify({ booking_id: bookingId })
