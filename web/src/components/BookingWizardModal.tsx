@@ -70,7 +70,9 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationMessage, setLocationMessage] = useState("");
   const [locationCaptured, setLocationCaptured] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<"cod" | "razorpay">("cod");
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "razorpay" | "upi_qr">("cod");
+  const [upiQr, setUpiQr] = useState<{image_url:string; amount:number; qr_id:string} | null>(null);
+  const [upiQrLoading, setUpiQrLoading] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined" || document.getElementById("razorpay-checkout-script")) return;
@@ -394,6 +396,22 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
       }
 
       const bookingId = String(res.booking_id);
+
+      if (paymentMethod === "upi_qr") {
+        setUpiQrLoading(true);
+        try {
+          const qr = await api.createRazorpayQr(bookingId);
+          if (!qr?.success || !qr?.image_url) throw new Error(qr?.error || "Could not create the UPI QR.");
+          setUpiQr({ image_url: String(qr.image_url), amount: Number(qr.amount || Math.round(total * 100)), qr_id: String(qr.qr_id || "") });
+          setSubmitError("");
+          return;
+        } catch (error) {
+          setSubmitError(error instanceof Error ? error.message : "Could not create the UPI QR.");
+          return;
+        } finally {
+          setUpiQrLoading(false);
+        }
+      }
 
       if (paymentMethod === "razorpay") {
         const order = await api.createRazorpayOrder(bookingId);
@@ -1149,14 +1167,39 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                           <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${paymentMethod === "razorpay" ? "border-[#0C4A34]" : "border-gray-400"}`}>
                             {paymentMethod === "razorpay" && <span className="w-2 h-2 rounded-full bg-[#0C4A34]" />}
                           </span>
-                          <span className="font-black text-sm text-[#121820]">Online Payment</span>
+                          <span className="font-black text-sm text-[#121820]">Razorpay Checkout</span>
                         </div>
-                        <p className="text-[10px] text-[#525D6C] mt-1.5 ml-6">Razorpay: UPI, cards and net banking when configured.</p>
+                        <p className="text-[10px] text-[#525D6C] mt-1.5 ml-6">UPI apps on mobile, cards and net banking.</p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod("upi_qr")}
+                        className={`text-left p-3 rounded-xl border-2 transition-all ${paymentMethod === "upi_qr" ? "border-[#0C4A34] bg-[#EBF5F0]" : "border-black/10 bg-white hover:border-black/20"}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`w-4 h-4 rounded-xl border-2 flex items-center justify-center ${paymentMethod === "upi_qr" ? "border-[#0C4A34]" : "border-gray-400"}`}>
+                            {paymentMethod === "upi_qr" && <span className="w-2 h-2 rounded-full bg-[#0C4A34]" />}
+                          </span>
+                          <span className="font-black text-sm text-[#121820]">UPI QR</span>
+                        </div>
+                        <p className="text-[10px] text-[#525D6C] mt-1.5 ml-6">Scan with PhonePe, Google Pay, Paytm or another UPI app.</p>
                       </button>
                     </div>
                     {paymentMethod === "cod" && (
                       <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-[11px] font-semibold text-emerald-900">
                         ✓ Cash on Delivery selected. Your booking will be confirmed without requiring payment now.
+                      </div>
+                    )}
+                    {paymentMethod === "upi_qr" && (
+                      <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-[11px] font-semibold text-blue-900">
+                        A unique QR for exactly ₹{total} will be generated after you confirm. Scan it with PhonePe, Google Pay or another UPI app. The amount is locked by Razorpay.
+                      </div>
+                    )}
+                    {upiQr && (
+                      <div className="mt-3 p-4 rounded-2xl bg-white border border-black/10 text-center">
+                        <div className="flex items-center justify-center gap-2 font-black text-[#121820]"><QrCode className="w-5 h-5" /> Scan & Pay ₹{Math.round(upiQr.amount / 100)}</div>
+                        <img src={upiQr.image_url} alt="Razorpay UPI payment QR" className="mx-auto mt-3 w-64 h-64 object-contain" />
+                        <p className="text-[11px] text-[#525D6C] mt-2">Scan with PhonePe, Google Pay, Paytm or another UPI app.</p>
                       </div>
                     )}
                     {paymentMethod === "razorpay" && (
